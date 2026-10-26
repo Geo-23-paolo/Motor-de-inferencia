@@ -1,1538 +1,927 @@
 #include <SFML/Graphics.hpp>
-#include <SFML/Audio.hpp>
 #include <algorithm>
-#include <cmath>
+#include <cctype>
+#include <fstream>
 #include <functional>
-#include <limits>
-#include <queue>
+#include <iostream>
+#include <map>
+#include <sstream>
+#include <string>
 #include <vector>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
-#include "Arenero.hpp"
-#include "Cama.hpp"
-#include "Comida.hpp"
-#include "Dueno.hpp"
-#include "Gato.hpp"
-#include "GatochiImplementaciones.hpp"
-#include "Juego.hpp"
-#include "Veterinario.hpp"
-
-int EjecutarJuego()
+namespace
 {
-    sf::RenderWindow window(sf::VideoMode(800, 600), "Gatochi");
-    window.setKeyRepeatEnabled(false);
-    Dueno dueno("Jugador");
-    Gato gato("Gatochi", 1);
-    Comida comida("comida", 3.0f);
-    Arenero arenero(true, "derecha");
-    Cama cama;
-    Veterinario veterinario("Veterinario", "Medicina felina");
+const sf::Color Background(10, 15, 24);
+const sf::Color Panel(18, 27, 40);
+const sf::Color PanelLight(24, 36, 52);
+const sf::Color Cyan(69, 211, 255);
+const sf::Color Green(80, 220, 150);
+const sf::Color Red(255, 100, 110);
+const sf::Color Muted(145, 164, 185);
 
-    sf::Texture coverTexture;
-    if (!coverTexture.loadFromFile("assets/Images/gatochi.jpg"))
+struct Formula
+{
+    enum Type { Atom, Not, And, Or, Nor, Xor, Imp, Iff };
+    Type type;
+    std::string atom;
+    Formula* left;
+    Formula* right;
+    Formula(Type t, const std::string& a = "") : type(t), atom(a), left(nullptr), right(nullptr) {}
+};
+
+struct Rule
+{
+    std::string original;
+    Formula* formula;
+    std::string formal;
+};
+
+struct Model
+{
+    std::map<std::string, bool> values;
+};
+
+struct TableauBranch
+{
+    std::vector<std::pair<std::string, bool>> literals;
+    bool closed;
+};
+
+std::string trim(const std::string& text)
+{
+    size_t first = text.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return "";
+    size_t last = text.find_last_not_of(" \t\r\n");
+    return text.substr(first, last - first + 1);
+}
+
+std::string lower(std::string text)
+{
+    std::transform(text.begin(), text.end(), text.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+}
+
+std::string replaceAll(std::string text, const std::string& from, const std::string& to)
+{
+    size_t position = 0;
+    while ((position = text.find(from, position)) != std::string::npos)
     {
-        return 1;
+        text.replace(position, from.size(), to);
+        position += to.size();
     }
+    return text;
+}
 
-    sf::Texture mainTexture;
-    if (!mainTexture.loadFromFile("assets/Images/Fondo Principal.jpg"))
+std::string cleanAtom(std::string text)
+{
+    text = trim(text);
+    text = lower(text);
+    const std::string prefixes[] = {"el ", "la ", "los ", "las ", "un ", "una ", "que "};
+    for (const std::string& prefix : prefixes)
     {
-        return 1;
+        if (text.compare(0, prefix.size(), prefix) == 0) text = trim(text.substr(prefix.size()));
     }
+    while (!text.empty() && std::ispunct(static_cast<unsigned char>(text.back())))
+        text.pop_back();
+    return trim(text);
+}
 
-    sf::Texture catIdleTexture;
-    if (!catIdleTexture.loadFromFile("assets/Images/Gato inactivo.png"))
+Formula* make(Formula::Type type, Formula* left = nullptr, Formula* right = nullptr,
+              const std::string& atom = "")
+{
+    Formula* result = new Formula(type, atom);
+    result->left = left;
+    result->right = right;
+    return result;
+}
+
+Formula* atomFormula(const std::string& value)
+{
+    return make(Formula::Atom, nullptr, nullptr, cleanAtom(value));
+}
+
+Formula* parseClause(const std::string& clause)
+{
+    std::string text = cleanAtom(clause);
+    if (text.empty()) return atomFormula("proposición vacía");
+    if (text.compare(0, 2, "o ") == 0) text = trim(text.substr(2));
+    if (text.compare(0, 3, "ni ") == 0)
     {
-        return 1;
-    }
-
-    sf::Texture catRightTexture;
-    if (!catRightTexture.loadFromFile("assets/Images/Gato Derecha.png"))
-    {
-        return 1;
-    }
-
-    sf::Texture catLeftTexture;
-    if (!catLeftTexture.loadFromFile("assets/Images/Gato Izquierda.png"))
-    {
-        return 1;
-    }
-
-    sf::Texture energyTexture;
-    if (!energyTexture.loadFromFile("assets/Images/Energia.png"))
-    {
-        return 1;
-    }
-
-    sf::Texture foodTexture;
-    if (!foodTexture.loadFromFile("assets/Images/Comida.png"))
-    {
-        return 1;
-    }
-
-    sf::Texture gameOverTexture;
-    if (!gameOverTexture.loadFromFile("assets/Images/Game Over.jpg"))
-    {
-        return 1;
-    }
-
-    sf::Texture registrationTexture;
-    if (!registrationTexture.loadFromFile("assets/Images/Registro.jpg"))
-    {
-        return 1;
-    }
-
-    sf::Texture labyrinthTexture;
-    if (!labyrinthTexture.loadFromFile("assets/Images/Laberinto.jpg"))
-    {
-        return 1;
-    }
-
-    sf::Texture catUpTexture;
-    if (!catUpTexture.loadFromFile("assets/Images/Caminado hacia arriba.png"))
-    {
-        return 1;
-    }
-
-    sf::Texture catDownTexture;
-    if (!catDownTexture.loadFromFile("assets/Images/Caminado hacia abajo.png"))
-    {
-        return 1;
-    }
-
-    sf::Texture mouseTexture;
-    if (!mouseTexture.loadFromFile("assets/Images/Raton.png"))
-    {
-        return 1;
-    }
-
-    auto fitSpriteToWindow = [](sf::Sprite& sprite, const sf::RenderWindow& window)
-    {
-        const sf::Vector2u spriteSize = sprite.getTexture()->getSize();
-        const float scaleX = static_cast<float>(window.getSize().x) / static_cast<float>(spriteSize.x);
-        const float scaleY = static_cast<float>(window.getSize().y) / static_cast<float>(spriteSize.y);
-        const float scale = std::min(scaleX, scaleY);
-        sprite.setScale(scale, scale);
-        sprite.setPosition(
-            (static_cast<float>(window.getSize().x) - static_cast<float>(spriteSize.x) * scale) / 2.0f,
-            (static_cast<float>(window.getSize().y) - static_cast<float>(spriteSize.y) * scale) / 2.0f);
-    };
-
-    sf::Sprite cover(coverTexture);
-    sf::Sprite background(mainTexture);
-    sf::Sprite cat(catIdleTexture);
-    sf::Sprite gameOverBackground(gameOverTexture);
-    sf::Sprite registrationBackground(registrationTexture);
-    sf::Sprite labyrinthBackground(labyrinthTexture);
-    sf::Sprite mouseSprite(mouseTexture);
-    fitSpriteToWindow(cover, window);
-    fitSpriteToWindow(background, window);
-    fitSpriteToWindow(gameOverBackground, window);
-    fitSpriteToWindow(registrationBackground, window);
-    fitSpriteToWindow(labyrinthBackground, window);
-
-    const sf::Vector2u mouseTextureSize = mouseTexture.getSize();
-    const float mouseScale = std::min(
-        55.0f / static_cast<float>(mouseTextureSize.x),
-        55.0f / static_cast<float>(mouseTextureSize.y));
-    mouseSprite.setScale(mouseScale, mouseScale);
-    mouseSprite.setOrigin(
-        static_cast<float>(mouseTextureSize.x) / 2.0f,
-        static_cast<float>(mouseTextureSize.y) / 2.0f);
-    mouseSprite.setPosition(
-        static_cast<float>(window.getSize().x) - 35.0f,
-        18.0f);
-
-    const sf::FloatRect labyrinthBounds = labyrinthBackground.getGlobalBounds();
-    const std::vector<std::string> labyrinthMap = {
-        "0000000000000000000000000000000000000000000000000000000000000000000000",
-        "0000000000000000000000000000000000000000000000000000000000000000000000",
-        "0111111111111111111111111111111111111111111111111111111111111111111110",
-        "0111111111111111111111111111111111111111111111111111111111111111111110",
-        "0111111111111111111111111111111111111111111111111111111111111111111110",
-        "0111110000011111111111110000001110111011100000001111110111111000001110",
-        "0111110000011111111111110000001110111011100000001111110111111000001110",
-        "01111111111111111011111111111111101110111111111111111110111111111111110",
-        "0111111111111111101111111111111111111111111111111111110111111111111110",
-        "0111111111111111101111111111111111111111111111111111110111111111111110",
-        "0111000111111111111111111111111111111111111111111111110111111111111110",
-        "0111111111110111111110111000000000000000000001111001111111011110111110",
-        "0111111111110111111110111001111111111111111001111001111111011111111110",
-        "0111111111110111111110111001111111111111111001111001111111011111111110",
-        "0000000011110111111110111000111111111111111001111001111111011111111110",
-        "1111110011110111000000111001111111111111111001111000000111011110000000",
-        "1111110011110111111111111001111111111111111001111000000111011110111111",
-        "1111110011110111111111111001111111111111111001111111111111011110111111",
-        "1111110011110111111111111001111111111111111001111111111111011110111111",
-        "0000000011110111111111111001111111111111111001111111111111011110111111",
-        "1111111111111111111111111111111111111111111111111111111111111110000000",
-        "1111111111111111111110111111111111111111111111111101111111111111111111",
-        "1111111111111111111111111111111111111111111111111111111111111111111111",
-        "1111111111111111111111111001111111111111111001111111111111111111111111",
-        "0000000011110111111111111001111111111111111001111111111111011110000000",
-        "1111111011110111111111111001111111111111111001111111111111011110111111",
-        "1111111011110111100000111001111111111111111001110000011111011110111111",
-        "1111111011110111111111111001111111111111111001110000011111011110111111",
-        "1111111011110111111111111000000001111100000001111111111111011110111111",
-        "0000000011110111111111111101111111111111111011111111111111011110000000",
-        "0111111111110111111111111111111111111111111111111111111111011111111110",
-        "0111111111110111111111111111111111111111111111111111111111011111111110",
-        "0111111111111111111101111111111111111111111111111111111111011111111110",
-        "0111110011111111111101111111111111111111111111111101111111111110111110",
-        "0111111111111111111101111101111111111111111111111101111111111111111110",
-        "0111111111111111111101111101111111111111111110111101111111111111111110",
-        "0111111111110111011101111101111000000000011110111101111011111111111110",
-        "0111100011110111011100111100000111110111111110111101111011111110001110",
-        "0111111111110000011111111100000111110111111110111101111000011111111110",
-        "0111111111110000011111111111111111110111111110111001111000011111111110",
-        "0111111111111111111111111111111111110111111111111111111111111111111110",
-        "0111111111111111111111111111111111110111111111111111111111111111111110",
-        "0111111111111111111111111111111111111111111111111111111111111111111110",
-        "0000000000000000000000000000000001111111000000000000000000000000000000",
-        "0000000000000000000000000000000001111111000000000000000000000000000000",
-    };
-    const int labyrinthRows = static_cast<int>(labyrinthMap.size());
-    const int labyrinthColumns = static_cast<int>(labyrinthMap.front().size());
-    const int labyrinthCatLogicalSize = 2;
-    auto labyrinthCollides = [&](const sf::FloatRect& bounds)
-    {
-        const float leftPixel = (bounds.left - labyrinthBounds.left) /
-            labyrinthBounds.width * labyrinthColumns;
-        const float topPixel = (bounds.top - labyrinthBounds.top) /
-            labyrinthBounds.height * labyrinthRows;
-        const float rightPixel = (bounds.left + bounds.width - labyrinthBounds.left) /
-            labyrinthBounds.width * labyrinthColumns;
-        const float bottomPixel = (bounds.top + bounds.height - labyrinthBounds.top) /
-            labyrinthBounds.height * labyrinthRows;
-        if (rightPixel < 0.0f || bottomPixel < 0.0f ||
-            leftPixel >= labyrinthColumns || topPixel >= labyrinthRows)
+        size_t niPos = text.find(" ni ", 3);
+        if (niPos != std::string::npos)
         {
-            return true;
+            Formula* left = parseClause(text.substr(3, niPos - 3));
+            Formula* right = parseClause(text.substr(niPos + 4));
+            return make(Formula::Nor, left, right);
         }
-        const int left = std::max(0, static_cast<int>(std::floor(leftPixel)));
-        const int top = std::max(0, static_cast<int>(std::floor(topPixel)));
-        const int right = std::min(
-            labyrinthColumns - 1, static_cast<int>(std::ceil(rightPixel)) - 1);
-        const int bottom = std::min(
-            labyrinthRows - 1, static_cast<int>(std::ceil(bottomPixel)) - 1);
-        for (int row = top; row <= bottom; ++row)
+    }
+    const std::string nandPrefix = "no es cierto que ";
+    if (text.compare(0, nandPrefix.size(), nandPrefix) == 0)
+    {
+        std::string conjunction = text.substr(nandPrefix.size());
+        const std::string suffix = " al mismo tiempo";
+        if (conjunction.size() > suffix.size() &&
+            conjunction.compare(conjunction.size() - suffix.size(), suffix.size(), suffix) == 0)
+            conjunction = trim(conjunction.substr(0, conjunction.size() - suffix.size()));
+        size_t andPos = conjunction.find(" y ");
+        if (andPos != std::string::npos)
         {
-            for (int column = left; column <= right; ++column)
-            {
-                if (labyrinthMap[row][column] == '0')
-                {
-                    return true;
-                }
-            }
+            Formula* left = parseClause(conjunction.substr(0, andPos));
+            Formula* right = parseClause(conjunction.substr(andPos + 3));
+            return make(Formula::Not, make(Formula::And, left, right));
         }
-        return false;
-    };
-
-    auto screenToLabyrinthCell = [&](const sf::Vector2f& position)
-    {
-        return sf::Vector2i(
-            std::clamp(static_cast<int>((position.x - labyrinthBounds.left) /
-                labyrinthBounds.width * labyrinthColumns) -
-                labyrinthCatLogicalSize / 2, 0,
-                labyrinthColumns - labyrinthCatLogicalSize),
-            std::clamp(static_cast<int>((position.y - labyrinthBounds.top) /
-                labyrinthBounds.height * labyrinthRows) -
-                labyrinthCatLogicalSize / 2, 0,
-                labyrinthRows - labyrinthCatLogicalSize));
-    };
-    auto labyrinthCellCenter = [&](const sf::Vector2i& cell)
-    {
-        return sf::Vector2f(
-            labyrinthBounds.left + (static_cast<float>(cell.x) +
-                labyrinthCatLogicalSize / 2.0f) /
-                labyrinthColumns * labyrinthBounds.width,
-            labyrinthBounds.top + (static_cast<float>(cell.y) +
-                labyrinthCatLogicalSize / 2.0f) /
-                labyrinthRows * labyrinthBounds.height);
-    };
-    auto findMousePath = [&](const sf::Vector2i& start, const sf::Vector2i& goal)
-    {
-        const int cellCount = labyrinthRows * labyrinthColumns;
-        const int startIndex = start.y * labyrinthColumns + start.x;
-        const int goalIndex = goal.y * labyrinthColumns + goal.x;
-        const int infinity = std::numeric_limits<int>::max();
-        std::vector<int> costs(cellCount, infinity);
-        std::vector<int> parents(cellCount, -1);
-        std::priority_queue<std::pair<int, int>,
-            std::vector<std::pair<int, int>>,
-            std::greater<std::pair<int, int>>> openSet;
-        const int directions[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
-        auto heuristic = [&](const sf::Vector2i& cell)
+        size_t orPos = conjunction.find(" o ");
+        if (orPos != std::string::npos)
         {
-            return std::abs(cell.x - goal.x) + std::abs(cell.y - goal.y);
-        };
-        auto canFit = [&](const sf::Vector2i& cell)
-        {
-            if (cell.x < 0 || cell.y < 0 ||
-                cell.x + labyrinthCatLogicalSize > labyrinthColumns ||
-                cell.y + labyrinthCatLogicalSize > labyrinthRows)
-            {
-                return false;
-            }
-            for (int row = cell.y;
-                row < cell.y + labyrinthCatLogicalSize; ++row)
-            {
-                for (int column = cell.x;
-                    column < cell.x + labyrinthCatLogicalSize; ++column)
-                {
-                    if (labyrinthMap[row][column] == '0')
-                    {
-                        return false;
-                    }
-                }
-            }
-            return true;
-        };
-
-        if (!canFit(start) || !canFit(goal))
-        {
-            return std::vector<sf::Vector2i>();
+            Formula* left = parseClause(conjunction.substr(0, orPos));
+            Formula* right = parseClause(conjunction.substr(orPos + 3));
+            return make(Formula::Nor, left, right);
         }
-        costs[startIndex] = 0;
-        openSet.push({heuristic(start), startIndex});
-        while (!openSet.empty())
-        {
-            const int currentIndex = openSet.top().second;
-            openSet.pop();
-            if (currentIndex == goalIndex)
-            {
-                break;
-            }
+    }
+    if (text.compare(0, 3, "no ") == 0)
+        return make(Formula::Not, atomFormula(text.substr(3)));
+    size_t internalNot = text.find(" no ");
+    if (internalNot != std::string::npos &&
+        text.find(" y ") == std::string::npos &&
+        text.find(" o ") == std::string::npos)
+    {
+        std::string positive = trim(text.substr(0, internalNot) + " " +
+                                    text.substr(internalNot + 4));
+        return make(Formula::Not, atomFormula(positive));
+    }
 
-            const sf::Vector2i current(
-                currentIndex % labyrinthColumns,
-                currentIndex / labyrinthColumns);
-            for (const auto& direction : directions)
+    size_t andPos = text.find(" y ");
+    if (andPos != std::string::npos)
+        return make(Formula::And, parseClause(text.substr(0, andPos)),
+                    parseClause(text.substr(andPos + 3)));
+    const std::string exclusiveSuffix = " pero no ambos";
+    size_t exclusivePos = text.find(exclusiveSuffix);
+    size_t orPos = text.find(" o ");
+    if (exclusivePos != std::string::npos && orPos != std::string::npos &&
+        orPos < exclusivePos)
+    {
+        return make(Formula::Xor, parseClause(text.substr(0, orPos)),
+                    parseClause(text.substr(orPos + 3,
+                                            exclusivePos - (orPos + 3))));
+    }
+    if (orPos != std::string::npos)
+        return make(Formula::Or, parseClause(text.substr(0, orPos)),
+                    parseClause(text.substr(orPos + 3)));
+    return atomFormula(text);
+}
+
+std::string formulaText(const Formula* formula, const std::map<std::string, char>& names)
+{
+    if (!formula) return "";
+    if (formula->type == Formula::Atom) return std::string(1, names.at(formula->atom));
+    if (formula->type == Formula::Not) return "~" + formulaText(formula->left, names);
+    if (formula->type == Formula::Xor)
+        return "((" + formulaText(formula->left, names) + " v " +
+               formulaText(formula->right, names) + ") & ~(" +
+               formulaText(formula->left, names) + " & " +
+               formulaText(formula->right, names) + "))";
+    if (formula->type == Formula::Nor)
+        return "~(" + formulaText(formula->left, names) + " v " +
+               formulaText(formula->right, names) + ")";
+    const std::string op = formula->type == Formula::And ? " & " :
+                           formula->type == Formula::Or ? " v " :
+                           formula->type == Formula::Xor ? " xor " :
+                           formula->type == Formula::Iff ? " <-> " : " -> ";
+    return "(" + formulaText(formula->left, names) + op +
+           formulaText(formula->right, names) + ")";
+}
+
+bool evaluate(const Formula* formula, const std::map<std::string, bool>& values)
+{
+    if (formula->type == Formula::Atom) return values.at(formula->atom);
+    if (formula->type == Formula::Not) return !evaluate(formula->left, values);
+    if (formula->type == Formula::And)
+        return evaluate(formula->left, values) && evaluate(formula->right, values);
+    if (formula->type == Formula::Or)
+        return evaluate(formula->left, values) || evaluate(formula->right, values);
+    if (formula->type == Formula::Iff)
+        return evaluate(formula->left, values) == evaluate(formula->right, values);
+    if (formula->type == Formula::Xor)
+        return evaluate(formula->left, values) != evaluate(formula->right, values);
+    if (formula->type == Formula::Nor)
+        return !evaluate(formula->left, values) && !evaluate(formula->right, values);
+    return !evaluate(formula->left, values) || evaluate(formula->right, values);
+}
+
+std::vector<std::string> linesOf(const std::string& text)
+{
+    std::vector<std::string> result;
+    std::stringstream stream(text);
+    std::string line;
+    while (std::getline(stream, line)) if (!trim(line).empty()) result.push_back(trim(line));
+    return result;
+}
+
+void drawText(sf::RenderWindow& window, sf::Font& font, const std::string& value,
+              float x, float y, unsigned size, sf::Color color = sf::Color::White)
+{
+    sf::Text text(value, font, size);
+    text.setFillColor(color);
+    text.setPosition(x, y);
+    window.draw(text);
+}
+
+std::vector<std::string> visualLines(const std::string& value, sf::Font& font,
+                                     unsigned size, float maxWidth)
+{
+    std::vector<std::string> result;
+    std::stringstream source(value);
+    std::string logicalLine;
+    while (std::getline(source, logicalLine))
+    {
+        if (logicalLine.empty())
+        {
+            result.push_back("");
+            continue;
+        }
+        std::string current;
+        std::stringstream words(logicalLine);
+        std::string word;
+        while (words >> word)
+        {
+            if (!current.empty())
             {
-                const int nextX = current.x + direction[0];
-                const int nextY = current.y + direction[1];
-                if (!canFit(sf::Vector2i(nextX, nextY)))
+                sf::Text measured(current + " " + word, font, size);
+                if (measured.getLocalBounds().width <= maxWidth)
                 {
+                    current += " " + word;
                     continue;
                 }
-                const int nextIndex = nextY * labyrinthColumns + nextX;
-                const int nextCost = costs[currentIndex] + 1;
-                if (nextCost < costs[nextIndex])
+                result.push_back(current);
+                current.clear();
+            }
+
+            std::string remainder = word;
+            while (!remainder.empty())
+            {
+                size_t fitting = remainder.size();
+                while (fitting > 1)
                 {
-                    costs[nextIndex] = nextCost;
-                    parents[nextIndex] = currentIndex;
-                    openSet.push({nextCost + heuristic({nextX, nextY}), nextIndex});
+                    sf::Text measured(remainder.substr(0, fitting), font, size);
+                    if (measured.getLocalBounds().width <= maxWidth) break;
+                    --fitting;
+                }
+                current = remainder.substr(0, fitting);
+                remainder.erase(0, fitting);
+                if (!remainder.empty())
+                {
+                    result.push_back(current);
+                    current.clear();
                 }
             }
         }
-
-        if (startIndex != goalIndex && parents[goalIndex] == -1)
-        {
-            return std::vector<sf::Vector2i>();
-        }
-        std::vector<sf::Vector2i> path;
-        for (int index = goalIndex; index != -1; index = parents[index])
-        {
-            path.push_back(sf::Vector2i(
-                index % labyrinthColumns, index / labyrinthColumns));
-        }
-        std::reverse(path.begin(), path.end());
-        return path;
-    };
-
-    const sf::Vector2u catSize = catIdleTexture.getSize();
-    const sf::Vector2u energySheetSize = energyTexture.getSize();
-    const int energyFrameWidth = static_cast<int>(energySheetSize.x / 2);
-    const int energyFrameHeight = static_cast<int>(energySheetSize.y);
-    const sf::Vector2u catRightSheetSize = catRightTexture.getSize();
-    const sf::Vector2u catLeftSheetSize = catLeftTexture.getSize();
-    const int catRightFrameCount = 4;
-    const int catRightFrameWidth = static_cast<int>(catRightSheetSize.x / catRightFrameCount);
-    const int catRightFrameHeight = static_cast<int>(catRightSheetSize.y);
-    const int catLeftFrameCount = 4;
-    const int catLeftFrameWidth = static_cast<int>(catLeftSheetSize.x / catLeftFrameCount);
-    const int catLeftFrameHeight = static_cast<int>(catLeftSheetSize.y);
-    const sf::Vector2u catUpSheetSize = catUpTexture.getSize();
-    const sf::Vector2u catDownSheetSize = catDownTexture.getSize();
-    const int catUpFrameCount = 4;
-    const int catDownFrameCount = 4;
-    const int catUpFrameWidth = static_cast<int>(catUpSheetSize.x / catUpFrameCount);
-    const int catUpFrameHeight = static_cast<int>(catUpSheetSize.y);
-    const int catDownFrameWidth = static_cast<int>(catDownSheetSize.x / catDownFrameCount);
-    const int catDownFrameHeight = static_cast<int>(catDownSheetSize.y);
-    const sf::FloatRect backgroundBounds = background.getGlobalBounds();
-    const float catScale = std::min(
-        (backgroundBounds.width * 0.16f) / static_cast<float>(catSize.x),
-        (backgroundBounds.height * 0.30f) / static_cast<float>(catSize.y));
-    const float catIdleVisualHeight = static_cast<float>(catSize.y) * catScale;
-    const float moveScaleBoost = 3.0f;
-    const float catRightScale =
-        (catIdleVisualHeight / static_cast<float>(catRightFrameHeight)) * moveScaleBoost;
-    const float catLeftScale =
-        (catIdleVisualHeight / static_cast<float>(catLeftFrameHeight)) * moveScaleBoost;
-    const float catGroundY = backgroundBounds.top + backgroundBounds.height * 0.87f;
-    const float rightAnimYOffset = 130.0f;
-    const float leftAnimYOffset = 130.0f;
-    const float catRightGroundY = catGroundY + rightAnimYOffset;
-    const float catLeftGroundY = catGroundY + leftAnimYOffset;
-    const float labyrinthCatScale = std::min(
-        (labyrinthBounds.width * 0.11f) / static_cast<float>(catSize.x),
-        (labyrinthBounds.height * 0.22f) / static_cast<float>(catSize.y));
-    const float labyrinthCatIdleScale = labyrinthCatScale * 0.49f;
-    const float labyrinthIdleVisualYOffset = -35.0f;
-    const float labyrinthCatVisualHeight =
-        static_cast<float>(catSize.y) * labyrinthCatScale;
-    const float labyrinthCatRightScale =
-        (labyrinthCatVisualHeight / static_cast<float>(catRightFrameHeight)) * 1.35f;
-    const float labyrinthCatLeftScale =
-        (labyrinthCatVisualHeight / static_cast<float>(catLeftFrameHeight)) * 1.35f;
-    const float labyrinthCatUpScale =
-        (labyrinthCatVisualHeight / static_cast<float>(catUpFrameHeight)) * 1.35f;
-    const float labyrinthCatDownScale =
-        (labyrinthCatVisualHeight / static_cast<float>(catDownFrameHeight)) * 1.35f;
-    auto labyrinthCollisionBounds = [&](const sf::Sprite& sprite)
-    {
-        const sf::FloatRect visualBounds = sprite.getGlobalBounds();
-        const float width = labyrinthBounds.width /
-            static_cast<float>(labyrinthColumns) * labyrinthCatLogicalSize;
-        const float height = labyrinthBounds.height /
-            static_cast<float>(labyrinthRows) * labyrinthCatLogicalSize;
-        return sf::FloatRect(
-            visualBounds.left + (visualBounds.width - width) / 2.0f,
-            visualBounds.top + (visualBounds.height - height) / 2.0f,
-            width, height);
-    };
-    cat.setOrigin(0.0f, cat.getLocalBounds().height);
-    cat.setScale(catScale, catScale);
-    cat.setPosition(
-        backgroundBounds.left + backgroundBounds.width * 0.47f,
-        catGroundY);
-
-    sf::Sprite energySprites[3];
-    const float energyScale = 0.10f;
-    const float energyMargin = 20.0f;
-    for (int index = 0; index < 3; ++index)
-    {
-        energySprites[index].setTexture(energyTexture);
-        energySprites[index].setTextureRect(
-            sf::IntRect(energyFrameWidth, 0, energyFrameWidth, energyFrameHeight));
-        energySprites[index].setScale(energyScale, energyScale);
-        energySprites[index].setPosition(
-            static_cast<float>(window.getSize().x) - energyMargin -
-                energyFrameWidth * energyScale * static_cast<float>(3 - index),
-            energyMargin);
+        if (!current.empty()) result.push_back(current);
     }
+    return result;
+}
 
-    sf::Font titleFont;
-    if (!titleFont.loadFromFile("C:/Windows/Fonts/arial.ttf"))
+void drawPanel(sf::RenderWindow& window, float x, float y, float width, float height)
+{
+    sf::RectangleShape shape(sf::Vector2f(width, height));
+    shape.setPosition(x, y);
+    shape.setFillColor(Panel);
+    shape.setOutlineThickness(1);
+    shape.setOutlineColor(sf::Color(38, 57, 78));
+    window.draw(shape);
+}
+
+void drawConnector(sf::RenderWindow& window, sf::Vector2f from, sf::Vector2f to,
+                   sf::Color color = Muted)
+{
+    sf::Vertex connector[] = {sf::Vertex(from, color), sf::Vertex(to, color)};
+    window.draw(connector, 2, sf::Lines);
+}
+
+std::string branchLiterals(const TableauBranch& branch,
+                           const std::vector<std::string>& atoms)
+{
+    std::string result;
+    for (const auto& literal : branch.literals)
     {
-        if (!titleFont.loadFromFile("C:/Windows/Fonts/calibri.ttf"))
+        const auto atom = std::find(atoms.begin(), atoms.end(), literal.first);
+        const size_t atomIndex = atom == atoms.end()
+            ? 0 : static_cast<size_t>(atom - atoms.begin());
+        if (!result.empty()) result += ", ";
+        result += literal.second ? "" : "~";
+        result += static_cast<char>('p' + atomIndex);
+    }
+    if (result.empty()) result = "(sin literales)";
+    if (result.size() > 25) result = result.substr(0, 22) + "...";
+    return result;
+}
+
+bool button(sf::RenderWindow& window, sf::Font& font, const std::string& label,
+            float x, float y, float width, bool hovered)
+{
+    sf::RectangleShape shape(sf::Vector2f(width, 34));
+    shape.setPosition(x, y);
+    shape.setFillColor(hovered ? PanelLight : Panel);
+    shape.setOutlineThickness(1);
+    shape.setOutlineColor(hovered ? Cyan : sf::Color(54, 75, 96));
+    window.draw(shape);
+    drawText(window, font, label, x + 12, y + 7, 14, hovered ? Cyan : sf::Color::White);
+    return hovered;
+}
+
+std::string jsonEscape(const std::string& value)
+{
+    std::string output;
+    for (char c : value)
+    {
+        if (c == '\\' || c == '"') output += '\\';
+        output += c;
+    }
+    return output;
+}
+
+void appendUtf8(std::string& text, unsigned int codepoint)
+{
+    if (codepoint < 0x80) text += static_cast<char>(codepoint);
+    else if (codepoint < 0x800)
+    {
+        text += static_cast<char>(0xC0 | (codepoint >> 6));
+        text += static_cast<char>(0x80 | (codepoint & 0x3F));
+    }
+    else
+    {
+        text += static_cast<char>(0xE0 | (codepoint >> 12));
+        text += static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+        text += static_cast<char>(0x80 | (codepoint & 0x3F));
+    }
+}
+
+std::string clipboardText()
+{
+#ifdef _WIN32
+    if (!OpenClipboard(nullptr)) return "";
+    HANDLE handle = GetClipboardData(CF_UNICODETEXT);
+    if (!handle)
+    {
+        CloseClipboard();
+        return "";
+    }
+    const wchar_t* wideText = static_cast<const wchar_t*>(GlobalLock(handle));
+    if (!wideText)
+    {
+        CloseClipboard();
+        return "";
+    }
+    std::string result;
+    for (size_t i = 0; wideText[i] != L'\0'; ++i)
+    {
+        unsigned int codepoint = static_cast<unsigned int>(wideText[i]);
+        if (codepoint == '\r') continue;
+        appendUtf8(result, codepoint);
+    }
+    GlobalUnlock(handle);
+    CloseClipboard();
+    return result;
+#else
+    return "";
+#endif
+}
+
+void deleteFormula(Formula* formula)
+{
+    if (!formula) return;
+    deleteFormula(formula->left);
+    deleteFormula(formula->right);
+    delete formula;
+}
+
+void addTableauLiteral(TableauBranch& branch, const std::string& atom, bool value)
+{
+    for (const auto& literal : branch.literals)
+    {
+        if (literal.first == atom && literal.second != value)
         {
-            if (!titleFont.loadFromFile("assets/Fonts/default.ttf"))
-            {
-                return 1;
-            }
-        }
-    }
-
-    comida.ConfigurarInterfaz(foodTexture, titleFont, backgroundBounds);
-    arenero.ConfigurarInterfaz(titleFont, backgroundBounds);
-    cama.ConfigurarInterfaz(titleFont, backgroundBounds);
-
-    sf::Text pressText;
-    pressText.setFont(titleFont);
-    pressText.setString("Presione espacio para jugar");
-    pressText.setCharacterSize(std::max(22u, static_cast<unsigned int>(window.getSize().y / 22u)));
-    pressText.setFillColor(sf::Color::White);
-    pressText.setStyle(sf::Text::Bold);
-    pressText.setPosition(
-        static_cast<float>(window.getSize().x) / 2.0f,
-        cover.getPosition().y + cover.getGlobalBounds().height + 26.0f);
-    pressText.setOrigin(
-        pressText.getLocalBounds().left + pressText.getLocalBounds().width / 2.0f,
-        pressText.getLocalBounds().top + pressText.getLocalBounds().height / 2.0f);
-
-    sf::Text foodText;
-    foodText.setFont(titleFont);
-    foodText.setString("ve a comer");
-    foodText.setCharacterSize(std::max(26u, static_cast<unsigned int>(window.getSize().y / 18u)));
-    foodText.setFillColor(sf::Color::White);
-    foodText.setStyle(sf::Text::Bold);
-    foodText.setPosition(
-        static_cast<float>(window.getSize().x) / 2.0f,
-        18.0f);
-    foodText.setOrigin(
-        foodText.getLocalBounds().left + foodText.getLocalBounds().width / 2.0f,
-        foodText.getLocalBounds().top);
-
-    sf::Text sickTimerText;
-    sickTimerText.setFont(titleFont);
-    sickTimerText.setCharacterSize(22);
-    sickTimerText.setFillColor(sf::Color(255, 210, 210));
-    sickTimerText.setStyle(sf::Text::Bold);
-    sickTimerText.setPosition(400.0f, 18.0f);
-    sickTimerText.setOrigin(
-        sickTimerText.getLocalBounds().left + sickTimerText.getLocalBounds().width / 2.0f,
-        sickTimerText.getLocalBounds().top);
-
-    sf::RectangleShape veterinarianOption(sf::Vector2f(300.0f, 46.0f));
-    veterinarianOption.setPosition(250.0f, 52.0f);
-    veterinarianOption.setFillColor(sf::Color(80, 30, 35, 230));
-    veterinarianOption.setOutlineThickness(2.0f);
-    veterinarianOption.setOutlineColor(sf::Color(255, 180, 180));
-
-    sf::Text veterinarianOptionText;
-    veterinarianOptionText.setFont(titleFont);
-    veterinarianOptionText.setString("Llevar al veterinario (V)");
-    veterinarianOptionText.setCharacterSize(20);
-    veterinarianOptionText.setFillColor(sf::Color::White);
-    veterinarianOptionText.setStyle(sf::Text::Bold);
-    veterinarianOptionText.setPosition(400.0f, 75.0f);
-    veterinarianOptionText.setOrigin(
-        veterinarianOptionText.getLocalBounds().left + veterinarianOptionText.getLocalBounds().width / 2.0f,
-        veterinarianOptionText.getLocalBounds().top + veterinarianOptionText.getLocalBounds().height / 2.0f);
-
-    sf::Text labyrinthOptionText;
-    labyrinthOptionText.setFont(titleFont);
-    labyrinthOptionText.setString("Presiona P para ir a jugar");
-    labyrinthOptionText.setCharacterSize(22);
-    labyrinthOptionText.setFillColor(sf::Color::White);
-    labyrinthOptionText.setStyle(sf::Text::Bold);
-    labyrinthOptionText.setPosition(400.0f, 112.0f);
-    labyrinthOptionText.setOrigin(
-        labyrinthOptionText.getLocalBounds().left + labyrinthOptionText.getLocalBounds().width / 2.0f,
-        labyrinthOptionText.getLocalBounds().top);
-
-    sf::RectangleShape sadOverlay(sf::Vector2f(
-        static_cast<float>(window.getSize().x), static_cast<float>(window.getSize().y)));
-    sadOverlay.setFillColor(sf::Color(35, 45, 75, 105));
-
-    sf::Text registrationTitle;
-    registrationTitle.setFont(titleFont);
-    registrationTitle.setString("Registro del veterinario");
-    registrationTitle.setCharacterSize(30);
-    registrationTitle.setFillColor(sf::Color::White);
-    registrationTitle.setStyle(sf::Text::Bold);
-    registrationTitle.setPosition(400.0f, 70.0f);
-    registrationTitle.setOrigin(
-        registrationTitle.getLocalBounds().left + registrationTitle.getLocalBounds().width / 2.0f,
-        registrationTitle.getLocalBounds().top);
-
-    sf::Text registrationLabels[3];
-    sf::Text registrationValues[3];
-    const char* registrationLabelText[3] = {"Nombre", "Edad", "Genero"};
-    for (int index = 0; index < 3; ++index)
-    {
-        registrationLabels[index].setFont(titleFont);
-        registrationLabels[index].setString(registrationLabelText[index]);
-        registrationLabels[index].setCharacterSize(22);
-        registrationLabels[index].setFillColor(sf::Color::White);
-        registrationLabels[index].setPosition(190.0f, 175.0f + index * 100.0f);
-
-        registrationValues[index].setFont(titleFont);
-        registrationValues[index].setCharacterSize(22);
-        registrationValues[index].setFillColor(sf::Color::Black);
-        registrationValues[index].setPosition(370.0f, 175.0f + index * 100.0f);
-    }
-
-    sf::RectangleShape registrationFields[3];
-    for (int index = 0; index < 3; ++index)
-    {
-        registrationFields[index].setSize(sf::Vector2f(300.0f, 46.0f));
-        registrationFields[index].setPosition(360.0f, 165.0f + index * 100.0f);
-        registrationFields[index].setFillColor(sf::Color(255, 255, 255, 220));
-        registrationFields[index].setOutlineThickness(3.0f);
-        registrationFields[index].setOutlineColor(sf::Color::White);
-    }
-
-    sf::Text registrationInstruction;
-    const std::string registrationInstructionDefault =
-        "Completa los datos y presiona Enter";
-    registrationInstruction.setFont(titleFont);
-    registrationInstruction.setString(registrationInstructionDefault);
-    registrationInstruction.setCharacterSize(20);
-    registrationInstruction.setFillColor(sf::Color::White);
-    registrationInstruction.setPosition(400.0f, 510.0f);
-    registrationInstruction.setOrigin(
-        registrationInstruction.getLocalBounds().left + registrationInstruction.getLocalBounds().width / 2.0f,
-        registrationInstruction.getLocalBounds().top);
-
-    sf::Text gameOverStateText;
-    gameOverStateText.setFont(titleFont);
-    gameOverStateText.setCharacterSize(24);
-    gameOverStateText.setFillColor(sf::Color::White);
-    gameOverStateText.setStyle(sf::Text::Bold);
-
-    sf::RectangleShape restartOption(sf::Vector2f(300.0f, 54.0f));
-    sf::RectangleShape reviveOption(sf::Vector2f(300.0f, 54.0f));
-    restartOption.setPosition(250.0f, 435.0f);
-    reviveOption.setPosition(250.0f, 500.0f);
-    restartOption.setFillColor(sf::Color(30, 30, 30, 220));
-    reviveOption.setFillColor(sf::Color(30, 30, 30, 220));
-    restartOption.setOutlineThickness(3.0f);
-    reviveOption.setOutlineThickness(3.0f);
-
-    sf::Text restartText;
-    restartText.setFont(titleFont);
-    restartText.setString("volver a iniciar el juego");
-    restartText.setCharacterSize(21);
-    restartText.setFillColor(sf::Color::White);
-    restartText.setPosition(400.0f, 462.0f);
-    restartText.setOrigin(
-        restartText.getLocalBounds().left + restartText.getLocalBounds().width / 2.0f,
-        restartText.getLocalBounds().top + restartText.getLocalBounds().height / 2.0f);
-
-    sf::Text reviveText;
-    reviveText.setFont(titleFont);
-    reviveText.setString("Revivir");
-    reviveText.setCharacterSize(21);
-    reviveText.setFillColor(sf::Color::White);
-    reviveText.setPosition(400.0f, 527.0f);
-    reviveText.setOrigin(
-        reviveText.getLocalBounds().left + reviveText.getLocalBounds().width / 2.0f,
-        reviveText.getLocalBounds().top + reviveText.getLocalBounds().height / 2.0f);
-
-    sf::Text veterinarianText;
-    veterinarianText.setFont(titleFont);
-    veterinarianText.setString("veterinario");
-    veterinarianText.setCharacterSize(36);
-    veterinarianText.setFillColor(sf::Color::White);
-    veterinarianText.setStyle(sf::Text::Bold);
-    veterinarianText.setPosition(
-        static_cast<float>(window.getSize().x) / 2.0f,
-        static_cast<float>(window.getSize().y) / 2.0f);
-    veterinarianText.setOrigin(
-        veterinarianText.getLocalBounds().left + veterinarianText.getLocalBounds().width / 2.0f,
-        veterinarianText.getLocalBounds().top + veterinarianText.getLocalBounds().height / 2.0f);
-
-    sf::Text healthText;
-    healthText.setFont(titleFont);
-    healthText.setString("SANO");
-    healthText.setCharacterSize(26);
-    healthText.setFillColor(sf::Color::White);
-    healthText.setStyle(sf::Text::Bold);
-    healthText.setPosition(
-        static_cast<float>(window.getSize().x) / 2.0f,
-        static_cast<float>(window.getSize().y) - 24.0f);
-    healthText.setOrigin(
-        healthText.getLocalBounds().left + healthText.getLocalBounds().width / 2.0f,
-        healthText.getLocalBounds().top + healthText.getLocalBounds().height / 2.0f);
-
-    sf::Music music;
-    if (!music.openFromFile("assets/Music/Fondo.mp3"))
-    {
-        return 1;
-    }
-    music.setLoop(true);
-    music.play();
-
-    sf::Music gameOverMusic;
-    if (!gameOverMusic.openFromFile("assets/Music/Game Over Song.mp3"))
-    {
-        return 1;
-    }
-    gameOverMusic.setLoop(true);
-
-    sf::Clock transitionClock;
-    sf::Clock frameClock;
-    sf::Clock catAnimClock;
-    sf::Clock healthTransitionClock;
-    bool transitioning = false;
-    bool started = false;
-    bool registrationScreen = false;
-    int selectedRegistrationField = 0;
-    std::string registrationValuesText[3];
-    int currentRightFrame = 0;
-    int currentLeftFrame = 0;
-    bool labyrinthIdleOffsetApplied = false;
-    const float rightFrameDuration = 0.10f;
-    const float leftFrameDuration = 0.10f;
-    auto moveLabyrinthCat = [&](bool movingRight, bool movingLeft,
-        bool movingUp, bool movingDown, float deltaTime)
-    {
-        const bool movingHorizontal = movingRight != movingLeft;
-        const bool movingVertical = movingUp != movingDown;
-        const sf::Texture* movementTexture = nullptr;
-        int* currentFrame = nullptr;
-        int frameWidth = 0;
-        int frameHeight = 0;
-        float movementScale = labyrinthCatScale;
-
-        if (movingVertical)
-        {
-            movementTexture = movingUp ? &catUpTexture : &catDownTexture;
-            currentFrame = movingUp ? &currentLeftFrame : &currentRightFrame;
-            frameWidth = movingUp ? catUpFrameWidth : catDownFrameWidth;
-            frameHeight = movingUp ? catUpFrameHeight : catDownFrameHeight;
-            movementScale = movingUp ? labyrinthCatUpScale : labyrinthCatDownScale;
-        }
-        else if (movingHorizontal)
-        {
-            movementTexture = movingRight ? &catRightTexture : &catLeftTexture;
-            currentFrame = movingRight ? &currentRightFrame : &currentLeftFrame;
-            frameWidth = movingRight ? catRightFrameWidth : catLeftFrameWidth;
-            frameHeight = movingRight ? catRightFrameHeight : catLeftFrameHeight;
-            movementScale = movingRight ? labyrinthCatRightScale : labyrinthCatLeftScale;
-        }
-
-        if (movementTexture == nullptr)
-        {
-            if (cat.getTexture() != &catIdleTexture)
-            {
-                const sf::Vector2f position = cat.getPosition();
-                cat.setTexture(catIdleTexture, true);
-                cat.setOrigin(0.0f, cat.getLocalBounds().height);
-                cat.setScale(labyrinthCatIdleScale, labyrinthCatIdleScale);
-                cat.setPosition(
-                    position.x, position.y + labyrinthIdleVisualYOffset);
-                labyrinthIdleOffsetApplied = true;
-                catAnimClock.restart();
-            }
+            // Conserva el literal conflictivo para que la hoja explique el cierre.
+            branch.literals.push_back({atom, value});
+            branch.closed = true;
             return;
         }
+    }
+    branch.literals.push_back({atom, value});
+}
 
-        if (cat.getTexture() != movementTexture)
-        {
-            if (labyrinthIdleOffsetApplied)
-            {
-                cat.move(0.0f, -labyrinthIdleVisualYOffset);
-                labyrinthIdleOffsetApplied = false;
-            }
-            *currentFrame = 0;
-            cat.setTexture(*movementTexture, true);
-            cat.setOrigin(0.0f, cat.getLocalBounds().height);
-            cat.setScale(movementScale, movementScale);
-            cat.setTextureRect(sf::IntRect(
-                0, 0, frameWidth, frameHeight));
-            catAnimClock.restart();
-        }
-        if (catAnimClock.getElapsedTime().asSeconds() >= rightFrameDuration)
-        {
-            *currentFrame = (*currentFrame + 1) % 4;
-            cat.setTextureRect(sf::IntRect(
-                *currentFrame * frameWidth, 0, frameWidth, frameHeight));
-            catAnimClock.restart();
-        }
-
-        const float movementSpeed = 260.0f;
-        const float horizontalDirection = movingRight ? 1.0f : -1.0f;
-        const float verticalDirection = movingDown ? 1.0f : -1.0f;
-        if (movingHorizontal)
-        {
-            const float previousX = cat.getPosition().x;
-            const float rightLimit = labyrinthBounds.left + labyrinthBounds.width -
-                cat.getGlobalBounds().width;
-            cat.setPosition(std::max(labyrinthBounds.left,
-                std::min(previousX + horizontalDirection * movementSpeed * deltaTime,
-                    rightLimit)), cat.getPosition().y);
-            if (labyrinthCollides(labyrinthCollisionBounds(cat)))
-            {
-                cat.setPosition(previousX, cat.getPosition().y);
-            }
-        }
-        if (movingVertical)
-        {
-            const float previousY = cat.getPosition().y;
-            const float verticalMovementMargin = labyrinthBounds.height * 5.0f /
-                static_cast<float>(labyrinthRows);
-            const float topLimit = labyrinthBounds.top - verticalMovementMargin +
-                cat.getGlobalBounds().height;
-            const float bottomLimit = labyrinthBounds.top + labyrinthBounds.height +
-                verticalMovementMargin;
-            cat.setPosition(cat.getPosition().x, std::max(topLimit,
-                std::min(previousY + verticalDirection * movementSpeed * deltaTime,
-                    bottomLimit)));
-            if (labyrinthCollides(labyrinthCollisionBounds(cat)))
-            {
-                cat.setPosition(cat.getPosition().x, previousY);
-            }
-        }
-    };
-    const float energyDrainInterval = 30.0f;
-    float movementEnergyTime = 0.0f;
-    sf::Clock foodWarningClock;
-    sf::Clock zeroEnergyClock;
-    sf::Clock sickDeathClock;
-    bool foodWarningStarted = false;
-    bool zeroEnergyTimerStarted = false;
-    bool sickDeathTimerStarted = false;
-    bool sick = false;
-    bool gameOver = false;
-    bool veterinarianScreen = false;
-    bool labyrinthScreen = false;
-    bool draggingMouse = false;
-    sf::Vector2f mouseDragOffset;
-    bool mouseTargetActive = false;
-    sf::Vector2i mouseTargetCell;
-    std::vector<sf::Vector2i> mousePath;
-    std::size_t mousePathIndex = 0;
-    int selectedGameOverOption = 0;
-    std::string gameOverState = "HAMBRIENTO";
-    const float baseCatSpeed = 220.0f;
-    const float healthTransitionDuration = 0.8f;
-    const float healthTransitionOffset = 180.0f;
-    int healthState = 0;
-    bool healthTransitioning = false;
-    std::vector<std::string> healthHistory{"SANO"};
-
-    auto healthStateName = [](int state)
+void buildTableau(std::vector<std::pair<Formula*, bool>> pending,
+                  TableauBranch branch, std::vector<TableauBranch>& result)
+{
+    if (pending.empty())
     {
-        return state == 4 ? std::string("ENFERMO") :
-            (state == 2 ? std::string("HAMBRIENTO") :
-            (state == 3 ? std::string("NECESITA IR AL BAÑO") :
-            (state == 0 ? std::string("SANO") : std::string("CANSADO"))));
-    };
-
-    auto enterGameOver = [&](const std::string& state)
+        result.push_back(branch);
+        return;
+    }
+    const Formula* formula = pending.back().first;
+    const bool sign = pending.back().second;
+    pending.pop_back();
+    if (branch.closed)
     {
-        if (!gameOver)
-        {
-            gameOverState = state;
-            gato.ReproducirVideo(
-                "assets/Images/video Angel.mp4",
-                window.getSystemHandle());
-            gameOver = true;
-            music.stop();
-            gameOverMusic.play();
-        }
-    };
-
-    while (window.isOpen())
+        result.push_back(branch);
+        return;
+    }
+    if (formula->type == Formula::Atom)
     {
-        const float deltaTime = frameClock.restart().asSeconds();
-        bool energyKeyPressed = false;
-        bool gameOverKeyPressed = false;
-        bool sleepKeyPressed = false;
-        bool eatKeyPressed = false;
-        bool bathroomKeyPressed = false;
-        bool restartKeyPressed = false;
-        bool enterKeyPressed = false;
-        bool upKeyPressed = false;
-        bool downKeyPressed = false;
-        bool veterinarianKeyPressed = false;
-        bool veterinarianMousePressed = false;
-        bool labyrinthKeyPressed = false;
-        bool escapeKeyPressed = false;
-
-        sf::Event event{};
-        while (window.pollEvent(event))
+        addTableauLiteral(branch, formula->atom, sign);
+        buildTableau(pending, branch, result);
+        return;
+    }
+    if (formula->type == Formula::Not)
+    {
+        pending.push_back({formula->left, !sign});
+        buildTableau(pending, branch, result);
+        return;
+    }
+    const bool isAnd = formula->type == Formula::And;
+    const bool isOr = formula->type == Formula::Or;
+    const bool isXor = formula->type == Formula::Xor;
+    const bool isNor = formula->type == Formula::Nor;
+    const bool isImp = formula->type == Formula::Imp;
+    const bool isIff = formula->type == Formula::Iff;
+    if ((isAnd && sign) || (isOr && !sign))
+    {
+        pending.push_back({formula->right, sign});
+        pending.push_back({formula->left, sign});
+        buildTableau(pending, branch, result);
+        return;
+    }
+    if ((isOr && sign) || (isAnd && !sign) || (isImp && sign))
+    {
+        TableauBranch leftBranch = branch;
+        TableauBranch rightBranch = branch;
+        if (isImp)
         {
-            if (event.type == sf::Event::Closed)
-            {
-                window.close();
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Space &&
-                !transitioning && !started && !registrationScreen && !gameOver)
-            {
-                registrationScreen = true;
-            }
-
-            if (event.type == sf::Event::MouseButtonPressed &&
-                event.mouseButton.button == sf::Mouse::Left && registrationScreen)
-            {
-                const sf::Vector2f mousePosition = window.mapPixelToCoords(
-                    sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
-                for (int index = 0; index < 3; ++index)
-                {
-                    if (registrationFields[index].getGlobalBounds().contains(mousePosition))
-                    {
-                        selectedRegistrationField = index;
-                    }
-                }
-            }
-
-            if (event.type == sf::Event::TextEntered && registrationScreen &&
-                event.text.unicode >= 32 && event.text.unicode < 127 &&
-                registrationValuesText[selectedRegistrationField].size() < 24)
-            {
-                registrationValuesText[selectedRegistrationField] +=
-                    static_cast<char>(event.text.unicode);
-                registrationInstruction.setString(registrationInstructionDefault);
-            }
-
-            if (event.type == sf::Event::KeyPressed && registrationScreen &&
-                event.key.code == sf::Keyboard::BackSpace &&
-                !registrationValuesText[selectedRegistrationField].empty())
-            {
-                registrationValuesText[selectedRegistrationField].pop_back();
-                registrationInstruction.setString(registrationInstructionDefault);
-            }
-
-            if (event.type == sf::Event::KeyPressed && registrationScreen &&
-                event.key.code == sf::Keyboard::Enter &&
-                !registrationValuesText[0].empty() &&
-                !registrationValuesText[1].empty() &&
-                !registrationValuesText[2].empty())
-            {
-                if (dueno.RegistrarGato(
-                        registrationValuesText[0],
-                        registrationValuesText[1],
-                        registrationValuesText[2],
-                        gato))
-                {
-                    registrationScreen = false;
-                    transitioning = true;
-                    transitionClock.restart();
-                    registrationInstruction.setString(registrationInstructionDefault);
-                }
-                else
-                {
-                    registrationInstruction.setString(
-                        "Edad invalida: ingresa un numero entre 1 y 30");
-                }
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Space && gameOver && !veterinarianScreen)
-            {
-                restartKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Enter && gameOver && !veterinarianScreen)
-            {
-                enterKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Up && gameOver && !veterinarianScreen)
-            {
-                upKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Down && gameOver && !veterinarianScreen)
-            {
-                downKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Num1 && started)
-            {
-                energyKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Num3 && started)
-            {
-                gameOverKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::E && started)
-            {
-                sleepKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::C && started)
-            {
-                eatKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::M && started)
-            {
-                bathroomKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::V && started)
-            {
-                veterinarianKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::P && started)
-            {
-                labyrinthKeyPressed = true;
-            }
-
-            if (event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::Escape && labyrinthScreen)
-            {
-                escapeKeyPressed = true;
-            }
-
-            if (labyrinthScreen && event.type == sf::Event::MouseButtonPressed &&
-                event.mouseButton.button == sf::Mouse::Left)
-            {
-                const sf::Vector2f mousePosition = window.mapPixelToCoords(
-                    sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
-                if (mouseSprite.getGlobalBounds().contains(mousePosition))
-                {
-                    draggingMouse = true;
-                    mouseDragOffset = mouseSprite.getPosition() - mousePosition;
-                }
-            }
-
-            if (labyrinthScreen && event.type == sf::Event::MouseMoved && draggingMouse)
-            {
-                const sf::Vector2f mousePosition = window.mapPixelToCoords(
-                    sf::Vector2i(event.mouseMove.x, event.mouseMove.y));
-                mouseSprite.setPosition(mousePosition + mouseDragOffset);
-            }
-
-            if (event.type == sf::Event::MouseButtonReleased &&
-                event.mouseButton.button == sf::Mouse::Left)
-            {
-                if (labyrinthScreen && draggingMouse)
-                {
-                    const sf::Vector2f mousePosition = window.mapPixelToCoords(
-                        sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
-                    if (labyrinthBounds.contains(mousePosition))
-                    {
-                        mouseTargetCell = screenToLabyrinthCell(mousePosition);
-                        mousePath.clear();
-                        mousePathIndex = 0;
-                        mouseTargetActive = true;
-                    }
-                }
-                draggingMouse = false;
-            }
-
-            if (event.type == sf::Event::MouseButtonPressed &&
-                event.mouseButton.button == sf::Mouse::Left && started)
-            {
-                const sf::Vector2f mousePosition = window.mapPixelToCoords(
-                    sf::Vector2i(event.mouseButton.x, event.mouseButton.y));
-                veterinarianMousePressed = veterinarianOption.getGlobalBounds().contains(mousePosition);
-            }
-        }
-
-        window.clear(sf::Color::Black);
-
-        if (restartKeyPressed || (enterKeyPressed && selectedGameOverOption == 0))
-        {
-            gato.Dormir();
-            gato.Comer(comida);
-            foodWarningStarted = false;
-            movementEnergyTime = 0.0f;
-            zeroEnergyTimerStarted = false;
-            sickDeathTimerStarted = false;
-            sick = false;
-            gameOver = false;
-            veterinarianScreen = false;
-            selectedGameOverOption = 0;
-            gameOverMusic.stop();
-            music.play();
-            started = false;
-            transitioning = false;
-            healthState = 0;
-            healthTransitioning = false;
-            healthHistory.clear();
-            healthHistory.push_back("SANO");
-            for (sf::Sprite& energySprite : energySprites)
-            {
-                energySprite.setTextureRect(
-                    sf::IntRect(energyFrameWidth, 0, energyFrameWidth, energyFrameHeight));
-            }
-            gato.Mover(cat, catIdleTexture, catRightTexture, catLeftTexture,
-                catRightFrameWidth, catRightFrameHeight, catLeftFrameWidth,
-                catLeftFrameHeight, catScale, catRightScale, catLeftScale,
-                catGroundY, catRightGroundY, catLeftGroundY, backgroundBounds,
-                catAnimClock, currentRightFrame, currentLeftFrame,
-                rightFrameDuration, leftFrameDuration, false, false, 0.0f, 0.0f);
-            cat.setPosition(
-                backgroundBounds.left + backgroundBounds.width * 0.47f,
-                catGroundY);
-        }
-
-        if (gameOver && (upKeyPressed || downKeyPressed))
-        {
-            selectedGameOverOption = selectedGameOverOption == 0 ? 1 : 0;
-        }
-
-        if (gameOver && enterKeyPressed && selectedGameOverOption == 1)
-        {
-            veterinario.RevivirGato(gato, comida, window.getSystemHandle());
-            foodWarningStarted = false;
-            movementEnergyTime = 0.0f;
-            zeroEnergyTimerStarted = false;
-            sickDeathTimerStarted = false;
-            sick = false;
-            gameOver = false;
-            veterinarianScreen = false;
-            selectedGameOverOption = 0;
-            gameOverMusic.stop();
-            music.play();
-            healthState = 0;
-            healthTransitioning = false;
-            healthHistory.clear();
-            healthHistory.push_back("SANO");
-            healthText.setString("SANO");
-            healthText.setPosition(
-                static_cast<float>(window.getSize().x) / 2.0f,
-                static_cast<float>(window.getSize().y) - 24.0f);
-            healthText.setOrigin(
-                healthText.getLocalBounds().left + healthText.getLocalBounds().width / 2.0f,
-                healthText.getLocalBounds().top + healthText.getLocalBounds().height / 2.0f);
-            for (sf::Sprite& energySprite : energySprites)
-            {
-                energySprite.setTextureRect(
-                    sf::IntRect(energyFrameWidth, 0, energyFrameWidth, energyFrameHeight));
-            }
-        }
-
-        if (registrationScreen)
-        {
-            for (int index = 0; index < 3; ++index)
-            {
-                registrationValues[index].setString(registrationValuesText[index]);
-                registrationFields[index].setOutlineColor(
-                    selectedRegistrationField == index ? sf::Color::Yellow : sf::Color::White);
-            }
-            window.draw(registrationBackground);
-            window.draw(registrationTitle);
-            for (int index = 0; index < 3; ++index)
-            {
-                window.draw(registrationLabels[index]);
-                window.draw(registrationFields[index]);
-                window.draw(registrationValues[index]);
-            }
-            window.draw(registrationInstruction);
-        }
-        else if (veterinarianScreen)
-        {
-            window.clear(sf::Color::Black);
-            window.draw(veterinarianText);
-        }
-        else if (labyrinthScreen)
-        {
-            if (escapeKeyPressed)
-            {
-                labyrinthScreen = false;
-                mouseTargetActive = false;
-                mousePath.clear();
-                mousePathIndex = 0;
-                cat.setTexture(catIdleTexture, true);
-                cat.setOrigin(0.0f, cat.getLocalBounds().height);
-                cat.setScale(catScale, catScale);
-                cat.setPosition(
-                    backgroundBounds.left + backgroundBounds.width * 0.47f,
-                    catGroundY);
-            }
-
-            const bool labyrinthMovingRight =
-                sf::Keyboard::isKeyPressed(sf::Keyboard::D) ||
-                sf::Keyboard::isKeyPressed(sf::Keyboard::Right);
-            const bool labyrinthMovingLeft =
-                sf::Keyboard::isKeyPressed(sf::Keyboard::A) ||
-                sf::Keyboard::isKeyPressed(sf::Keyboard::Left);
-            const bool labyrinthMovingUp =
-                sf::Keyboard::isKeyPressed(sf::Keyboard::W) ||
-                sf::Keyboard::isKeyPressed(sf::Keyboard::Up);
-            const bool labyrinthMovingDown =
-                sf::Keyboard::isKeyPressed(sf::Keyboard::S) ||
-                sf::Keyboard::isKeyPressed(sf::Keyboard::Down);
-            if (!escapeKeyPressed)
-            {
-                if (mouseTargetActive)
-                {
-                    if (mousePath.empty())
-                    {
-                        const sf::FloatRect catBounds = cat.getGlobalBounds();
-                        const sf::Vector2f catCenter(
-                            catBounds.left + catBounds.width / 2.0f,
-                            catBounds.top + catBounds.height / 2.0f);
-                        mousePath = findMousePath(
-                            screenToLabyrinthCell(catCenter), mouseTargetCell);
-                        mousePathIndex = mousePath.size() > 1 ? 1 : mousePath.size();
-                    }
-
-                    if (mousePathIndex < mousePath.size())
-                    {
-                        const sf::FloatRect catBounds = cat.getGlobalBounds();
-                        const sf::Vector2f catCenter(
-                            catBounds.left + catBounds.width / 2.0f,
-                            catBounds.top + catBounds.height / 2.0f);
-                        const sf::Vector2f nextCellCenter = labyrinthCellCenter(
-                            mousePath[mousePathIndex]);
-                        const float cellWidth = labyrinthBounds.width /
-                            static_cast<float>(labyrinthColumns);
-                        const float cellHeight = labyrinthBounds.height /
-                            static_cast<float>(labyrinthRows);
-                        if (std::abs(catCenter.x - nextCellCenter.x) <= cellWidth * 0.25f &&
-                            std::abs(catCenter.y - nextCellCenter.y) <= cellHeight * 0.25f)
-                        {
-                            ++mousePathIndex;
-                        }
-                        else
-                        {
-                            const bool moveRight = nextCellCenter.x > catCenter.x;
-                            const bool moveLeft = nextCellCenter.x < catCenter.x;
-                            const bool moveDown = nextCellCenter.y > catCenter.y;
-                            const bool moveUp = nextCellCenter.y < catCenter.y;
-                            moveLabyrinthCat(moveRight, moveLeft,
-                                moveUp, moveDown, deltaTime);
-                        }
-                    }
-                    else
-                    {
-                        mouseTargetActive = false;
-                    }
-                }
-                else
-                {
-                    moveLabyrinthCat(labyrinthMovingRight, labyrinthMovingLeft,
-                        labyrinthMovingUp, labyrinthMovingDown, deltaTime);
-                }
-
-                if (cat.getGlobalBounds().intersects(mouseSprite.getGlobalBounds()))
-                {
-                    if (gato.ObtenerEnergia() > 0)
-                    {
-                        gato.PerderEnergia();
-                        energySprites[gato.ObtenerEnergia()].setTextureRect(
-                            sf::IntRect(0, 0, energyFrameWidth, energyFrameHeight));
-                    }
-                    labyrinthScreen = false;
-                    mouseTargetActive = false;
-                    mousePath.clear();
-                    mousePathIndex = 0;
-                    draggingMouse = false;
-                    cat.setTexture(catIdleTexture, true);
-                    cat.setOrigin(0.0f, cat.getLocalBounds().height);
-                    cat.setScale(catScale, catScale);
-                    cat.setPosition(
-                        backgroundBounds.left + backgroundBounds.width * 0.47f,
-                        catGroundY);
-                }
-            }
-
-            window.draw(labyrinthBackground);
-            window.draw(mouseSprite);
-            window.draw(cat);
-        }
-        else if (gameOver)
-        {
-            restartOption.setOutlineColor(selectedGameOverOption == 0 ? sf::Color::Yellow : sf::Color::White);
-            reviveOption.setOutlineColor(selectedGameOverOption == 1 ? sf::Color::Yellow : sf::Color::White);
-            gameOverStateText.setString("pasaste de " + gameOverState + " a MUERTO");
-            gameOverStateText.setPosition(
-                static_cast<float>(window.getSize().x) / 2.0f,
-                385.0f);
-            gameOverStateText.setOrigin(
-                gameOverStateText.getLocalBounds().left + gameOverStateText.getLocalBounds().width / 2.0f,
-                gameOverStateText.getLocalBounds().top + gameOverStateText.getLocalBounds().height / 2.0f);
-            window.draw(gameOverBackground);
-            window.draw(gameOverStateText);
-            window.draw(restartOption);
-            window.draw(reviveOption);
-            window.draw(restartText);
-            window.draw(reviveText);
-        }
-        else if (started)
-        {
-            const bool movingRight =
-                sf::Keyboard::isKeyPressed(sf::Keyboard::D) ||
-                sf::Keyboard::isKeyPressed(sf::Keyboard::Right);
-            const bool movingLeft =
-                sf::Keyboard::isKeyPressed(sf::Keyboard::A) ||
-                sf::Keyboard::isKeyPressed(sf::Keyboard::Left);
-            const bool moving = movingRight != movingLeft;
-            const int energy = gato.ObtenerEnergia();
-            const bool nearBed = cama.EstaCerca(cat.getPosition().x);
-            const bool nearFood = comida.CercaDeComida(cat.getPosition().x);
-            const bool nearBathroom = arenero.EstaCerca(cat.getPosition().x);
-            const float doorX = backgroundBounds.left + backgroundBounds.width * 0.5f;
-            const bool nearDoor = std::abs(cat.getPosition().x - doorX) <=
-                backgroundBounds.width * 0.12f;
-
-            if (labyrinthKeyPressed && energy > 0 && nearDoor)
-            {
-                labyrinthScreen = true;
-                cat.setTexture(catIdleTexture, true);
-                cat.setOrigin(0.0f, cat.getLocalBounds().height);
-                cat.setScale(labyrinthCatIdleScale, labyrinthCatIdleScale);
-                cat.setPosition(
-                    labyrinthBackground.getGlobalBounds().left +
-                        labyrinthBackground.getGlobalBounds().width / 2.0f -
-                        cat.getGlobalBounds().width / 2.0f,
-                    labyrinthBackground.getGlobalBounds().top +
-                        labyrinthBackground.getGlobalBounds().height * 0.54f +
-                        cat.getGlobalBounds().height / 2.0f);
-            }
-
-            if (energy == 0 && !zeroEnergyTimerStarted)
-            {
-                zeroEnergyClock.restart();
-                zeroEnergyTimerStarted = true;
-            }
-
-            if (energy > 0)
-            {
-                zeroEnergyTimerStarted = false;
-                sick = false;
-            }
-
-            const float zeroEnergySeconds = zeroEnergyTimerStarted ?
-                zeroEnergyClock.getElapsedTime().asSeconds() : 0.0f;
-            if (!sick && zeroEnergySeconds >= 30.0f)
-            {
-                sick = true;
-                sickDeathClock.restart();
-                sickDeathTimerStarted = true;
-            }
-
-            if (sick && sickDeathTimerStarted &&
-                sickDeathClock.getElapsedTime().asSeconds() >= 30.0f)
-            {
-                enterGameOver("ENFERMO");
-            }
-
-            if (sick && (veterinarianKeyPressed || veterinarianMousePressed))
-            {
-                veterinario.CurarGato(gato, window.getSystemHandle());
-                for (sf::Sprite& energySprite : energySprites)
-                {
-                    energySprite.setTextureRect(
-                        sf::IntRect(energyFrameWidth, 0, energyFrameWidth, energyFrameHeight));
-                }
-                movementEnergyTime = 0.0f;
-                zeroEnergyTimerStarted = false;
-                sickDeathTimerStarted = false;
-                sick = false;
-            }
-
-            if (bathroomKeyPressed && nearBathroom)
-            {
-                gato.IrAlBano(arenero, comida, window.getSystemHandle(),
-                    cat.getPosition().x);
-            }
-
-            if (eatKeyPressed && gato.Comer(comida, "assets/Images/Comer.mp4",
-                window.getSystemHandle(), cat.getPosition().x))
-            {
-                foodWarningStarted = false;
-            }
-
-            const int food = comida.ObtenerCantidad();
-
-            if (food == 0 && !foodWarningStarted)
-            {
-                foodWarningClock.restart();
-                foodWarningStarted = true;
-            }
-
-            if (gameOverKeyPressed)
-            {
-                enterGameOver(food == 0 ? "HAMBRIENTO" :
-                    (food == 3 ? "NECESITA IR AL BAÑO" :
-                    (energy > 0 ? "SANO" : "CANSADO")));
-            }
-
-            if (food == 0)
-            {
-                const int secondsRemaining = std::max(
-                    0, 30 - static_cast<int>(foodWarningClock.getElapsedTime().asSeconds()));
-                foodText.setString("ve a comer " + std::to_string(secondsRemaining) + "s");
-                foodText.setOrigin(
-                    foodText.getLocalBounds().left + foodText.getLocalBounds().width / 2.0f,
-                    foodText.getLocalBounds().top);
-
-                if (secondsRemaining == 0)
-                {
-                    enterGameOver("HAMBRIENTO");
-                }
-            }
-
-            if (!sick && sleepKeyPressed && gato.Dormir(cama, "assets/Images/Dormir.mp4",
-                window.getSystemHandle(), cat.getPosition().x))
-            {
-                window.setActive(true);
-                window.clear(sf::Color::Black);
-                window.display();
-                movementEnergyTime = 0.0f;
-                for (sf::Sprite& energySprite : energySprites)
-                {
-                    energySprite.setTextureRect(
-                        sf::IntRect(energyFrameWidth, 0, energyFrameWidth, energyFrameHeight));
-                }
-                gato.Mover(cat, catIdleTexture, catRightTexture, catLeftTexture,
-                    catRightFrameWidth, catRightFrameHeight, catLeftFrameWidth,
-                    catLeftFrameHeight, catScale, catRightScale, catLeftScale,
-                    catGroundY, catRightGroundY, catLeftGroundY, backgroundBounds,
-                    catAnimClock, currentRightFrame, currentLeftFrame,
-                    rightFrameDuration, leftFrameDuration, false, false, 0.0f, 0.0f);
-                currentRightFrame = 0;
-                currentLeftFrame = 0;
-                catAnimClock.restart();
-            }
-
-            if (energyKeyPressed && gato.ObtenerEnergia() > 0)
-            {
-                gato.PerderEnergia();
-                energySprites[gato.ObtenerEnergia()].setTextureRect(
-                    sf::IntRect(0, 0, energyFrameWidth, energyFrameHeight));
-            }
-
-            if (moving)
-            {
-                movementEnergyTime += deltaTime;
-                while (movementEnergyTime >= energyDrainInterval && gato.ObtenerEnergia() > 0)
-                {
-                    movementEnergyTime -= energyDrainInterval;
-                    gato.PerderEnergia();
-                    energySprites[gato.ObtenerEnergia()].setTextureRect(
-                        sf::IntRect(0, 0, energyFrameWidth, energyFrameHeight));
-                }
-            }
-
-            const bool isHealthy = gato.ObtenerEnergia() > 0;
-            const int currentHealthState = sick ? 4 : (!isHealthy ? 1 :
-                (food == 0 ? 2 : (food == 3 ? 3 : 0)));
-            const std::string currentState = healthStateName(currentHealthState);
-            if (currentHealthState != healthState)
-            {
-                healthHistory.push_back(currentState);
-                healthText.setString(currentState);
-                healthTransitionClock.restart();
-                healthTransitioning = true;
-                healthState = currentHealthState;
-            }
-
-            if (healthTransitioning)
-            {
-                const float progress = std::min(
-                    healthTransitionClock.getElapsedTime().asSeconds() /
-                        healthTransitionDuration,
-                    1.0f);
-                const float transitionX = static_cast<float>(window.getSize().x) / 2.0f -
-                    healthTransitionOffset * (1.0f - progress);
-                healthText.setPosition(transitionX, static_cast<float>(window.getSize().y) - 24.0f);
-                healthText.setOrigin(
-                    healthText.getLocalBounds().left + healthText.getLocalBounds().width / 2.0f,
-                    healthText.getLocalBounds().top + healthText.getLocalBounds().height / 2.0f);
-
-                if (progress >= 1.0f)
-                {
-                    healthText.setString(currentState);
-                    healthText.setPosition(
-                        static_cast<float>(window.getSize().x) / 2.0f,
-                        static_cast<float>(window.getSize().y) - 24.0f);
-                    healthText.setOrigin(
-                        healthText.getLocalBounds().left + healthText.getLocalBounds().width / 2.0f,
-                        healthText.getLocalBounds().top + healthText.getLocalBounds().height / 2.0f);
-                    healthTransitioning = false;
-                }
-            }
-
-            const float catSpeed = sick ? baseCatSpeed * 0.1f : baseCatSpeed *
-                (0.4f + 0.2f * static_cast<float>(gato.ObtenerEnergia()));
-            gato.Mover(cat, catIdleTexture, catRightTexture, catLeftTexture,
-                catRightFrameWidth, catRightFrameHeight, catLeftFrameWidth,
-                catLeftFrameHeight, catScale, catRightScale, catLeftScale,
-                catGroundY, catRightGroundY, catLeftGroundY, backgroundBounds,
-                catAnimClock, currentRightFrame, currentLeftFrame,
-                rightFrameDuration, leftFrameDuration, movingRight, movingLeft,
-                deltaTime, catSpeed);
-
-            window.draw(background);
-            if (sick)
-            {
-                window.draw(sadOverlay);
-            }
-            window.draw(cat);
-            for (const sf::Sprite& energySprite : energySprites)
-            {
-                window.draw(energySprite);
-            }
-            comida.Dibujar(window);
-            if (food == 0)
-            {
-                window.draw(foodText);
-                if (nearFood)
-                {
-                    comida.DibujarAviso(window);
-                }
-            }
-            else if (nearBathroom)
-            {
-                arenero.DibujarAviso(window);
-            }
-            else if (gato.ObtenerEnergia() == 0 && !sick)
-            {
-                if (nearBed)
-                {
-                    cama.DibujarAviso(window);
-                }
-            }
-            if (gato.ObtenerEnergia() == 0 && !sick && zeroEnergyTimerStarted)
-            {
-                const int secondsRemaining = std::max(
-                    0, 30 - static_cast<int>(zeroEnergySeconds));
-                sickTimerText.setString("enferma en " + std::to_string(secondsRemaining) + "s");
-                sickTimerText.setOrigin(
-                    sickTimerText.getLocalBounds().left + sickTimerText.getLocalBounds().width / 2.0f,
-                    sickTimerText.getLocalBounds().top);
-                window.draw(sickTimerText);
-            }
-            if (sick)
-            {
-                window.draw(veterinarianOption);
-                window.draw(veterinarianOptionText);
-            }
-            if (energy > 0 && nearDoor)
-            {
-                window.draw(labyrinthOptionText);
-            }
-
-            window.draw(healthText);
-            float stateLeft = healthText.getGlobalBounds().left;
-            for (std::size_t index = healthHistory.size() - 1; index > 0; --index)
-            {
-                sf::Text arrow("->", titleFont, 22);
-                arrow.setFillColor(sf::Color(220, 220, 220));
-                const float arrowWidth = arrow.getLocalBounds().width;
-                arrow.setPosition(stateLeft - 16.0f - arrowWidth / 2.0f,
-                    static_cast<float>(window.getSize().y) - 24.0f);
-                arrow.setOrigin(
-                    arrow.getLocalBounds().left + arrow.getLocalBounds().width / 2.0f,
-                    arrow.getLocalBounds().top + arrow.getLocalBounds().height / 2.0f);
-
-                sf::Text previousState(healthHistory[index - 1], titleFont, 22);
-                previousState.setFillColor(sf::Color(180, 180, 180));
-                const float previousWidth = previousState.getLocalBounds().width;
-                previousState.setPosition(
-                    arrow.getPosition().x - arrowWidth / 2.0f - 12.0f - previousWidth / 2.0f,
-                    static_cast<float>(window.getSize().y) - 24.0f);
-                previousState.setOrigin(
-                    previousState.getLocalBounds().left + previousState.getLocalBounds().width / 2.0f,
-                    previousState.getLocalBounds().top + previousState.getLocalBounds().height / 2.0f);
-
-                window.draw(previousState);
-                window.draw(arrow);
-                stateLeft = previousState.getGlobalBounds().left;
-            }
-        }
-        else if (transitioning)
-        {
-            const float elapsed = transitionClock.getElapsedTime().asSeconds();
-            const float duration = 1.2f;
-            const float progress = std::min(elapsed / duration, 1.0f);
-
-            const sf::Uint8 coverAlpha = static_cast<sf::Uint8>(255.0f * (1.0f - progress));
-            const sf::Uint8 backgroundAlpha = static_cast<sf::Uint8>(255.0f * progress);
-
-            background.setColor(sf::Color(255, 255, 255, backgroundAlpha));
-            cover.setColor(sf::Color(255, 255, 255, coverAlpha));
-            cat.setColor(sf::Color(255, 255, 255, backgroundAlpha));
-
-            window.draw(background);
-            window.draw(cat);
-            window.draw(cover);
-
-            if (progress >= 1.0f)
-            {
-                started = true;
-                transitioning = false;
-                background.setColor(sf::Color::White);
-                cover.setColor(sf::Color::White);
-                cat.setColor(sf::Color::White);
-            }
+            pending.push_back({formula->left, false});
+            buildTableau(pending, leftBranch, result);
+            pending.pop_back();
+            pending.push_back({formula->right, true});
+            buildTableau(pending, rightBranch, result);
         }
         else
         {
-            window.draw(cover);
-            window.draw(pressText);
+            pending.push_back({formula->left, sign});
+            buildTableau(pending, leftBranch, result);
+            pending.pop_back();
+            pending.push_back({formula->right, sign});
+            buildTableau(pending, rightBranch, result);
         }
-
-        window.display();
+        return;
     }
+    if (isIff && sign)
+    {
+        TableauBranch sameBranch = branch;
+        pending.push_back({formula->right, true});
+        pending.push_back({formula->left, true});
+        buildTableau(pending, sameBranch, result);
 
-    return 0;
+        TableauBranch oppositeBranch = branch;
+        pending.pop_back();
+        pending.pop_back();
+        pending.push_back({formula->right, false});
+        pending.push_back({formula->left, false});
+        buildTableau(pending, oppositeBranch, result);
+        return;
+    }
+    if (isXor && sign)
+    {
+        TableauBranch leftBranch = branch;
+        TableauBranch rightBranch = branch;
+        pending.push_back({formula->left, true});
+        pending.push_back({formula->right, false});
+        buildTableau(pending, leftBranch, result);
+        pending.pop_back();
+        pending.pop_back();
+        pending.push_back({formula->left, false});
+        pending.push_back({formula->right, true});
+        buildTableau(pending, rightBranch, result);
+        return;
+    }
+    if (isNor && sign)
+    {
+        pending.push_back({formula->right, false});
+        pending.push_back({formula->left, false});
+        buildTableau(pending, branch, result);
+        return;
+    }
+    if (isNor && !sign)
+    {
+        TableauBranch leftBranch = branch;
+        TableauBranch rightBranch = branch;
+        pending.push_back({formula->left, true});
+        buildTableau(pending, leftBranch, result);
+        pending.pop_back();
+        pending.push_back({formula->right, true});
+        buildTableau(pending, rightBranch, result);
+        return;
+    }
+    if (isXor && !sign)
+    {
+        TableauBranch sameBranch = branch;
+        pending.push_back({formula->left, true});
+        pending.push_back({formula->right, true});
+        buildTableau(pending, sameBranch, result);
+        pending.pop_back();
+        pending.pop_back();
+        TableauBranch oppositeBranch = branch;
+        pending.push_back({formula->left, false});
+        pending.push_back({formula->right, false});
+        buildTableau(pending, oppositeBranch, result);
+        return;
+    }
+    if (isIff && !sign)
+    {
+        TableauBranch leftBranch = branch;
+        TableauBranch rightBranch = branch;
+        pending.push_back({formula->left, true});
+        pending.push_back({formula->right, false});
+        buildTableau(pending, leftBranch, result);
+        pending.pop_back();
+        pending.pop_back();
+        pending.push_back({formula->left, false});
+        pending.push_back({formula->right, true});
+        buildTableau(pending, rightBranch, result);
+        return;
+    }
+    pending.push_back({formula->left, true});
+    pending.push_back({formula->right, false});
+    buildTableau(pending, branch, result);
+}
 }
 
-int main()
+int main(int argc, char** argv)
 {
-    return EjecutarJuego();
+    sf::RenderWindow window(sf::VideoMode(1280, 760), "Inferencia Proposicional | Gatochi");
+    window.setFramerateLimit(60);
+    sf::Font font;
+    if (!font.loadFromFile("C:/Windows/Fonts/consola.ttf") &&
+        !font.loadFromFile("C:/Windows/Fonts/arial.ttf"))
+        return 1;
+
+    std::string input =
+        "Si llueve, entonces el piso esta mojado.\n"
+        "Llueve.";
+    std::vector<Rule> rules;
+    std::vector<std::string> atoms;
+    std::vector<Model> models;
+    std::vector<TableauBranch> tableau;
+    bool satisfiable = false;
+    bool analyzed = false;
+    bool inputFocus = true;
+    sf::Vector2i mouse;
+
+    auto analyze = [&]()
+    {
+        for (Rule& rule : rules) deleteFormula(rule.formula);
+        rules.clear();
+        atoms.clear();
+        models.clear();
+        tableau.clear();
+        std::map<std::string, bool> seen;
+        std::map<std::string, char> names;
+        const std::vector<std::string> source = linesOf(input);
+        for (const std::string& original : source)
+        {
+            std::string text = lower(original);
+            text = replaceAll(text, "á", "a");
+            text = replaceAll(text, "é", "e");
+            text = replaceAll(text, "í", "i");
+            text = replaceAll(text, "ó", "o");
+            text = replaceAll(text, "ú", "u");
+            size_t ifPos = text.find("si ");
+            size_t thenPos = text.find(" entonces ");
+            size_t commaPos = text.find(',');
+            size_t onlyPos = text.find(" solo ");
+            size_t conditionPos = onlyPos == std::string::npos
+                ? std::string::npos : text.find(" si ", onlyPos + 6);
+            size_t iffPos = text.find(" si y solo si ");
+            Formula* formula = nullptr;
+            if (iffPos != std::string::npos)
+            {
+                Formula* left = parseClause(text.substr(0, iffPos));
+                Formula* right = parseClause(text.substr(iffPos + 14));
+                formula = make(Formula::Iff, left, right);
+            }
+            else if (ifPos == 0 && thenPos != std::string::npos)
+            {
+                Formula* premise = parseClause(text.substr(3, thenPos - 3));
+                Formula* consequence = parseClause(text.substr(thenPos + 10));
+                formula = make(Formula::Imp, premise, consequence);
+            }
+            else if (ifPos == 0 && commaPos != std::string::npos)
+            {
+                Formula* premise = parseClause(text.substr(3, commaPos - 3));
+                Formula* consequence = parseClause(text.substr(commaPos + 1));
+                formula = make(Formula::Imp, premise, consequence);
+            }
+            else if (onlyPos != std::string::npos && conditionPos != std::string::npos)
+            {
+                Formula* consequence = parseClause(text.substr(0, onlyPos));
+                Formula* condition = parseClause(text.substr(conditionPos + 4));
+                formula = make(Formula::Imp, consequence, condition);
+            }
+            else formula = parseClause(text);
+            rules.push_back({original, formula, ""});
+            std::vector<std::string> found;
+            std::function<void(const Formula*)> collect = [&](const Formula* f)
+            {
+                if (!f) return;
+                if (f->type == Formula::Atom) found.push_back(f->atom);
+                else { collect(f->left); collect(f->right); }
+            };
+            collect(formula);
+            for (const std::string& atom : found) if (!seen[atom])
+            {
+                seen[atom] = true;
+                atoms.push_back(atom);
+            }
+        }
+        for (size_t i = 0; i < atoms.size(); ++i)
+            names[atoms[i]] = static_cast<char>('p' + i);
+        for (Rule& rule : rules) rule.formal = formulaText(rule.formula, names);
+        std::vector<std::pair<Formula*, bool>> pending;
+        for (const Rule& rule : rules) pending.push_back({rule.formula, true});
+        buildTableau(pending, TableauBranch{{}, false}, tableau);
+
+        const size_t count = atoms.size() > 12 ? 12 : atoms.size();
+        const unsigned long total = 1UL << count;
+        for (unsigned long mask = 0; mask < total; ++mask)
+        {
+            Model model;
+            for (size_t i = 0; i < count; ++i)
+                model.values[atoms[i]] = (mask & (1UL << i)) != 0;
+            bool valid = true;
+            for (const Rule& rule : rules) if (!evaluate(rule.formula, model.values)) valid = false;
+            if (valid) models.push_back(model);
+        }
+        satisfiable = !rules.empty() && !models.empty();
+        analyzed = true;
+    };
+
+    if (argc > 1 && std::string(argv[1]) == "--test")
+    {
+        std::ifstream suite("test_suite.txt");
+        if (!suite)
+        {
+            std::cerr << "[ ERROR ] No se encontro test_suite.txt\n";
+            return 1;
+        }
+        std::string line;
+        unsigned passed = 0;
+        unsigned total = 0;
+        while (std::getline(suite, line))
+        {
+            if (trim(line).empty() || trim(line)[0] == '#') continue;
+            std::vector<std::string> fields;
+            std::stringstream row(line);
+            std::string field;
+            while (std::getline(row, field, '|')) fields.push_back(trim(field));
+            if (fields.size() != 4)
+            {
+                std::cout << "[ FAIL ] linea invalida: " << line << "\n";
+                ++total;
+                continue;
+            }
+            input.clear();
+            std::stringstream rulesStream(fields[1]);
+            while (std::getline(rulesStream, field, ';'))
+            {
+                if (!input.empty()) input += '\n';
+                input += trim(field);
+            }
+            analyze();
+            ++total;
+            const bool expectedSat = fields[2] == "SATISFACIBLE";
+            bool ok = satisfiable == expectedSat;
+            std::string reason;
+            if (!ok)
+                reason = "esperaba " + fields[2] + " pero obtuvo " +
+                         (satisfiable ? "SATISFACIBLE" : "INSATISFACIBLE");
+
+            if (ok && expectedSat && fields[3] != "NINGUNO")
+            {
+                std::vector<std::string> expectedModels;
+                std::stringstream modelStream(fields[3]);
+                while (std::getline(modelStream, field, ';'))
+                    expectedModels.push_back(trim(field));
+                std::vector<std::string> actualModels;
+                for (const Model& model : models)
+                {
+                    std::string value;
+                    for (size_t i = 0; i < atoms.size(); ++i)
+                    {
+                        if (!value.empty()) value += ",";
+                        value += static_cast<char>('p' + i);
+                        value += model.values.at(atoms[i]) ? "=V" : "=F";
+                    }
+                    actualModels.push_back(value);
+                }
+                std::sort(expectedModels.begin(), expectedModels.end());
+                std::sort(actualModels.begin(), actualModels.end());
+                if (expectedModels != actualModels)
+                {
+                    ok = false;
+                    reason = "modelos esperados no coinciden";
+                }
+            }
+            if (ok)
+            {
+                ++passed;
+                std::cout << "[ PASS ] " << fields[0] << "\n";
+            }
+            else
+                std::cout << "[ FAIL ] " << fields[0] << " - Razon: " << reason << "\n";
+        }
+        const double accuracy = total == 0 ? 0.0 :
+            (100.0 * static_cast<double>(passed) / static_cast<double>(total));
+        std::cout << passed << "/" << total << " Pruebas pasadas - "
+                  << accuracy << "% Accuracy\n";
+        for (Rule& rule : rules) deleteFormula(rule.formula);
+        return passed == total ? 0 : 1;
+    }
+
+    analyze();
+    while (window.isOpen())
+    {
+        mouse = sf::Mouse::getPosition(window);
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed) window.close();
+            if (event.type == sf::Event::MouseButtonPressed &&
+                event.mouseButton.button == sf::Mouse::Left)
+            {
+                const float x = static_cast<float>(event.mouseButton.x);
+                const float y = static_cast<float>(event.mouseButton.y);
+                if (x >= 20 && x <= 380 && y >= 105 && y <= 520) inputFocus = true;
+                else if (x >= 20 && x <= 190 && y >= 550 && y <= 590)
+                {
+                    analyze();
+                    inputFocus = false;
+                }
+                else if (x >= 205 && x <= 375 && y >= 550 && y <= 590)
+                {
+                    std::ofstream file("analisis_proposicional.json");
+                    file << "{\n  \"entrada\": \"" << jsonEscape(input) << "\",\n  \"atomos\": [";
+                    for (size_t i = 0; i < atoms.size(); ++i)
+                        file << (i ? ", " : "") << "\"" << jsonEscape(atoms[i]) << "\"";
+                    file << "],\n  \"formulas\": [";
+                    for (size_t i = 0; i < rules.size(); ++i)
+                        file << (i ? ", " : "") << "\"" << jsonEscape(rules[i].formal) << "\"";
+                    file << "],\n  \"resultado\": \"" << (satisfiable ? "Satisfacible" : "Insatisfacible") << "\"\n}\n";
+                }
+                else if (x >= 390 && x <= 560 && y >= 550 && y <= 590)
+                {
+                    input.clear();
+                    for (Rule& rule : rules) deleteFormula(rule.formula);
+                    rules.clear(); atoms.clear(); models.clear(); tableau.clear();
+                    analyzed = false; satisfiable = false;
+                    inputFocus = true;
+                }
+            }
+            if (event.type == sf::Event::TextEntered && inputFocus)
+            {
+                if (event.text.unicode == 8)
+                {
+                    if (!input.empty()) input.pop_back();
+                }
+                else if (event.text.unicode >= 32 && event.text.unicode != 127)
+                    appendUtf8(input, event.text.unicode);
+            }
+            if (event.type == sf::Event::KeyPressed && inputFocus &&
+                event.key.code == sf::Keyboard::Return)
+            {
+                input += '\n';
+            }
+            if (event.type == sf::Event::KeyPressed && inputFocus &&
+                event.key.code == sf::Keyboard::V &&
+                (event.key.control || event.key.system))
+            {
+                input += clipboardText();
+            }
+        }
+
+        window.clear(Background);
+        drawText(window, font, "INFERENCE // PROPOSITIONAL LOGIC ENGINE", 20, 18, 22, Cyan);
+        drawText(window, font, "5-STAGE PIPELINE  |  READY", 900, 23, 13, Green);
+        drawPanel(window, 20, 65, 360, 465);
+        drawPanel(window, 400, 65, 405, 465);
+        drawPanel(window, 825, 65, 435, 465);
+        drawText(window, font, "01  ENTRADA DE REGLAS", 35, 78, 16, Cyan);
+        drawText(window, font, "Escribe una regla por linea:", 35, 102, 13, Muted);
+        sf::RectangleShape editor(sf::Vector2f(330, 385));
+        editor.setPosition(35, 125); editor.setFillColor(sf::Color(7, 11, 18));
+        editor.setOutlineThickness(1); editor.setOutlineColor(inputFocus ? Cyan : sf::Color(54, 75, 96));
+        window.draw(editor);
+        std::vector<std::string> entered = visualLines(input, font, 13, 310);
+        float textY = 138;
+        for (const std::string& line : entered)
+        {
+            drawText(window, font, "> " + line, 45, textY, 13, sf::Color(220, 230, 240));
+            textY += 23;
+            if (textY > 488) break;
+        }
+        drawText(window, font, inputFocus ? "EDITANDO" : "PULSA ANALIZAR", 45, 490, 11, inputFocus ? Green : Muted);
+        const bool hoverAnalyze = mouse.x >= 20 && mouse.x <= 190 && mouse.y >= 550 && mouse.y <= 590;
+        const bool hoverSave = mouse.x >= 205 && mouse.x <= 375 && mouse.y >= 550 && mouse.y <= 590;
+        const bool hoverClear = mouse.x >= 390 && mouse.x <= 560 && mouse.y >= 550 && mouse.y <= 590;
+        button(window, font, "[ ANALIZAR ]", 20, 550, 170, hoverAnalyze);
+        button(window, font, "[ GUARDAR JSON ]", 205, 550, 170, hoverSave);
+        button(window, font, "[ CERRAR / LIMPIAR ]", 390, 550, 170, hoverClear);
+
+        drawText(window, font, "02  EXTRACTOR DE ATOMOS", 415, 78, 16, Cyan);
+        drawText(window, font, "Variable   Significado", 420, 108, 13, Muted);
+        for (size_t i = 0; i < atoms.size() && i < 12; ++i)
+        {
+            std::string variable(1, static_cast<char>('p' + i));
+            drawText(window, font, variable + "          " + atoms[i], 425, 132 + static_cast<float>(i) * 23, 13, Green);
+        }
+        drawText(window, font, "03  TRADUCTOR DE REGLAS", 415, 430, 16, Cyan);
+        for (size_t i = 0; i < rules.size() && i < 3; ++i)
+            drawText(window, font, "R" + std::to_string(i + 1) + "  " + rules[i].formal, 425, 458 + static_cast<float>(i) * 20, 13);
+
+        drawText(window, font, "04  ARBOL SEMANTICO / TABLEAU", 840, 78, 16, Cyan);
+        drawText(window, font, "Enramajes y hojas del arbol:", 850, 105, 12, Muted);
+        sf::RectangleShape root(sf::Vector2f(210, 28));
+        root.setPosition(937, 125);
+        root.setFillColor(PanelLight);
+        root.setOutlineThickness(1);
+        root.setOutlineColor(Cyan);
+        window.draw(root);
+        drawText(window, font, analyzed ? "REGLAS / RAIZ" : "SIN ANALISIS", 963, 131, 12);
+
+        const size_t visibleBranches = std::min<size_t>(tableau.size(), 6);
+        const float firstLeafX = 850.0f;
+        const float leafY = 250.0f;
+        const float rootX = 1042.0f;
+        const float rootY = 153.0f;
+        if (visibleBranches == 0)
+        {
+            drawText(window, font, "Sin ramas: entrada vacia", 930, 205, 12, Muted);
+        }
+        else
+        {
+            for (size_t branchIndex = 0; branchIndex < visibleBranches; ++branchIndex)
+            {
+                const TableauBranch& branch = tableau[branchIndex];
+                const float x = visibleBranches == 1
+                    ? 1028.0f : firstLeafX + static_cast<float>(branchIndex) *
+                      ((1230.0f - firstLeafX) / static_cast<float>(visibleBranches - 1));
+                const float splitX = visibleBranches == 1 ? rootX : (rootX + x) / 2.0f;
+                drawConnector(window, sf::Vector2f(rootX, rootY),
+                              sf::Vector2f(splitX, 195.0f), branch.closed ? Red : Green);
+                drawConnector(window, sf::Vector2f(splitX, 195.0f),
+                              sf::Vector2f(x, leafY), branch.closed ? Red : Green);
+
+                sf::CircleShape splitNode(4);
+                splitNode.setOrigin(4, 4);
+                splitNode.setPosition(splitX, 195);
+                splitNode.setFillColor(branch.closed ? Red : Green);
+                window.draw(splitNode);
+
+                sf::RectangleShape leaf(sf::Vector2f(72, 54));
+                leaf.setPosition(x - 36, leafY);
+                leaf.setFillColor(branch.closed ? sf::Color(62, 28, 38) : sf::Color(24, 58, 49));
+                leaf.setOutlineThickness(1);
+                leaf.setOutlineColor(branch.closed ? Red : Green);
+                window.draw(leaf);
+                drawText(window, font, "B" + std::to_string(branchIndex + 1),
+                         x - 30, leafY + 5, 10, branch.closed ? Red : Green);
+                drawText(window, font, branch.closed ? "[X]" : "[ ]",
+                         x - 30, leafY + 20, 10, branch.closed ? Red : Green);
+                std::string literals = branchLiterals(branch, atoms);
+                if (literals.size() > 12) literals = literals.substr(0, 9) + "...";
+                sf::Text literalText(literals, font, 9);
+                literalText.setFillColor(sf::Color::White);
+                const float literalWidth = literalText.getLocalBounds().width;
+                literalText.setPosition(x - literalWidth / 2.0f, leafY + 37);
+                window.draw(literalText);
+            }
+        }
+        drawText(window, font, "Verde = abierta    Rojo/X = cerrada", 850, 320, 11, Muted);
+        drawText(window, font, "05  REPORTE DE MODELOS", 840, 350, 16, Cyan);
+        drawText(window, font, "ESTADO:", 850, 385, 13, Muted);
+        drawText(window, font, satisfiable ? "SATISFACIBLE" : "INSATISFACIBLE", 930, 383, 17, satisfiable ? Green : Red);
+        drawText(window, font, "Modelos que cumplen todas las reglas:", 850, 415, 12, Muted);
+        for (size_t i = 0; i < models.size() && i < 8; ++i)
+        {
+            std::string row = "M" + std::to_string(i + 1) + "  ";
+            for (size_t atomIndex = 0; atomIndex < atoms.size(); ++atomIndex)
+                row += std::string(1, static_cast<char>('p' + atomIndex)) + "=" +
+                       (models[i].values.at(atoms[atomIndex]) ? "V  " : "F  ");
+            drawText(window, font, row, 855, 440 + static_cast<float>(i) * 18, 12, Green);
+        }
+        drawText(window, font, "Guardar crea: analisis_proposicional.json", 840, 505, 11, Muted);
+        window.display();
+    }
+    for (Rule& rule : rules) deleteFormula(rule.formula);
+    return 0;
 }

@@ -35,7 +35,7 @@ else
 RUN_COMMAND ?= $(WINE) $(TARGET)
 endif
 
-.PHONY: all build run clean
+.PHONY: all build run test clean
 
 all: build
 
@@ -56,6 +56,9 @@ endif
 
 run: build
 	$(RUN_COMMAND)
+
+test: build
+	./$(TARGET) --test
 
 clean:
 	rm -f $(OBJECTS) $(TARGET)

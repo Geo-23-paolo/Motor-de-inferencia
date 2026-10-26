@@ -1,0 +1,14 @@
+# ID | reglas separadas por punto y coma | estado esperado | modelos esperados
+TEST_01 | El motor arranca y la banda se mueve | SATISFACIBLE | p=V,q=V
+TEST_02 | El motor arranca o la banda se mueve | SATISFACIBLE | p=V,q=F; p=F,q=V; p=V,q=V
+TEST_03 | Si el motor arranca entonces la banda se mueve; El motor arranca | SATISFACIBLE | p=V,q=V
+TEST_04 | El motor arranca y el motor no arranca | INSATISFACIBLE | NINGUNO
+TEST_05 | No es cierto que el motor arranca y la banda se mueve | SATISFACIBLE | p=F,q=V; p=V,q=F; p=F,q=F
+TEST_06 | No es cierto que el motor arranca o la banda se mueve | SATISFACIBLE | p=F,q=F
+TEST_07 | El sensor detecta la pieza si y solo si la luz se enciende; El sensor detecta la pieza | SATISFACIBLE | p=V,q=V
+TEST_08 | Si hay error entonces la alarma suena; La alarma no suena | SATISFACIBLE | p=F,q=F
+TEST_09 | O el LED es rojo o el LED es verde pero no ambos; El LED es rojo | SATISFACIBLE | p=V,q=F
+TEST_10 | Si p entonces q; Si q entonces r; p; No r | INSATISFACIBLE | NINGUNO
+TEST_11 | p o q o r; No p; No q | SATISFACIBLE | p=F,q=F,r=V
+TEST_12 | Si hay energia, la pantalla enciende | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
+TEST_13 | La pantalla solo enciende si hay energia | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
