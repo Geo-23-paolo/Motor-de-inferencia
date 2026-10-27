@@ -1,4 +1,4 @@
-# Gatochi: motor de inferencia proposicional
+motor de inferencia proposicional
 
 Motor educativo de inferencia proposicional escrito en C++17 con una interfaz
 grafica construida sobre SFML. Permite escribir reglas en espanol, traducirlas
