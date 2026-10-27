@@ -12,3 +12,21 @@ TEST_10 | Si p entonces q; Si q entonces r; p; No r | INSATISFACIBLE | NINGUNO
 TEST_11 | p o q o r; No p; No q | SATISFACIBLE | p=F,q=F,r=V
 TEST_12 | Si hay energia, la pantalla enciende | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
 TEST_13 | La pantalla solo enciende si hay energia | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
+TEST_14 | Es falso que el sensor activo y la alarma encendida | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=F
+TEST_15 | Tanto el motor arranca como la banda se mueve | SATISFACIBLE | p=V,q=V
+TEST_16 | Ya sea el motor arranca o la banda se mueve | SATISFACIBLE | p=F,q=V; p=V,q=F; p=V,q=V
+TEST_17 | O bien el LED rojo o bien el LED verde pero no ambos | SATISFACIBLE | p=F,q=V; p=V,q=F
+TEST_18 | El motor arranca solo si la banda se mueve | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
+TEST_19 | El motor arranca es condicion suficiente para la banda se mueve | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
+TEST_20 | La banda se mueve es condicion necesaria para el motor arranca | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
+TEST_21 | El motor arranca equivale a la banda se mueve | SATISFACIBLE | p=F,q=F; p=V,q=V
+TEST_22 | Nunca el motor arranca | SATISFACIBLE | p=F
+TEST_23 | Ni el motor arranca ni la banda se mueve | SATISFACIBLE | p=F,q=F
+TEST_24 | En caso de que el motor arranque, la banda se mueve | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
+TEST_25 | Siempre que el sensor detecta la pieza, la luz se enciende | SATISFACIBLE | p=F,q=F; p=F,q=V; p=V,q=V
+TEST_26 | El motor arranca si y solamente si la banda se mueve | SATISFACIBLE | p=F,q=F; p=V,q=V
+TEST_27 | La alarma suena aunque el sensor detecta la pieza | SATISFACIBLE | p=V,q=V
+TEST_28 | Si esta lloviendo, el piso esta mojado; Llueve | SATISFACIBLE | p=V,q=V
+TEST_29 | Llueve; No esta lloviendo | INSATISFACIBLE | NINGUNO
+TEST_30 | Esta detectando; Detecta | SATISFACIBLE | p=V
+TEST_31 | La mesa es verde; La mesa no es verde | INSATISFACIBLE | NINGUNO

@@ -1,0 +1,227 @@
+﻿ID	Frase	Regla	Forma
+F001	el motor arranca y la banda se mueve	p & q	conjuncion-y
+F002	el motor arranca o la banda se mueve	p v q	disyuncion-o
+F003	no el motor arranca	~p	negacion-no
+F004	el motor arranca solo si la banda se mueve	p -> q	condicional-solo-si
+F005	el motor arranca si y solo si la banda se mueve	p <-> q	bicondicional-sysy
+F006	el motor arranca y el sensor detecta la pieza	p & q	conjuncion-y
+F007	el motor arranca o el sensor detecta la pieza	p v q	disyuncion-o
+F008	no el motor arranca	~p	negacion-no
+F009	el motor arranca solo si el sensor detecta la pieza	p -> q	condicional-solo-si
+F010	el motor arranca si y solo si el sensor detecta la pieza	p <-> q	bicondicional-sysy
+F011	el motor arranca y la luz se enciende	p & q	conjuncion-y
+F012	el motor arranca o la luz se enciende	p v q	disyuncion-o
+F013	no el motor arranca	~p	negacion-no
+F014	el motor arranca solo si la luz se enciende	p -> q	condicional-solo-si
+F015	el motor arranca si y solo si la luz se enciende	p <-> q	bicondicional-sysy
+F016	el motor arranca y la alarma suena	p & q	conjuncion-y
+F017	el motor arranca o la alarma suena	p v q	disyuncion-o
+F018	no el motor arranca	~p	negacion-no
+F019	el motor arranca solo si la alarma suena	p -> q	condicional-solo-si
+F020	el motor arranca si y solo si la alarma suena	p <-> q	bicondicional-sysy
+F021	el motor arranca y el sistema reinicia	p & q	conjuncion-y
+F022	el motor arranca o el sistema reinicia	p v q	disyuncion-o
+F023	no el motor arranca	~p	negacion-no
+F024	el motor arranca solo si el sistema reinicia	p -> q	condicional-solo-si
+F025	el motor arranca si y solo si el sistema reinicia	p <-> q	bicondicional-sysy
+F026	el motor arranca y el panel responde	p & q	conjuncion-y
+F027	el motor arranca o el panel responde	p v q	disyuncion-o
+F028	no el motor arranca	~p	negacion-no
+F029	el motor arranca solo si el panel responde	p -> q	condicional-solo-si
+F030	el motor arranca si y solo si el panel responde	p <-> q	bicondicional-sysy
+F031	el motor arranca y la valvula abre	p & q	conjuncion-y
+F032	el motor arranca o la valvula abre	p v q	disyuncion-o
+F033	no el motor arranca	~p	negacion-no
+F034	el motor arranca solo si la valvula abre	p -> q	condicional-solo-si
+F035	el motor arranca si y solo si la valvula abre	p <-> q	bicondicional-sysy
+F036	el motor arranca y la bomba activa	p & q	conjuncion-y
+F037	el motor arranca o la bomba activa	p v q	disyuncion-o
+F038	no el motor arranca	~p	negacion-no
+F039	el motor arranca solo si la bomba activa	p -> q	condicional-solo-si
+F040	el motor arranca si y solo si la bomba activa	p <-> q	bicondicional-sysy
+F041	el motor arranca y el control habilita	p & q	conjuncion-y
+F042	el motor arranca o el control habilita	p v q	disyuncion-o
+F043	no el motor arranca	~p	negacion-no
+F044	el motor arranca solo si el control habilita	p -> q	condicional-solo-si
+F045	el motor arranca si y solo si el control habilita	p <-> q	bicondicional-sysy
+F046	la banda se mueve y el motor arranca	p & q	conjuncion-y
+F047	la banda se mueve o el motor arranca	p v q	disyuncion-o
+F048	no la banda se mueve	~p	negacion-no
+F049	la banda se mueve solo si el motor arranca	p -> q	condicional-solo-si
+F050	la banda se mueve si y solo si el motor arranca	p <-> q	bicondicional-sysy
+F051	la banda se mueve y el sensor detecta la pieza	p & q	conjuncion-y
+F052	la banda se mueve o el sensor detecta la pieza	p v q	disyuncion-o
+F053	no la banda se mueve	~p	negacion-no
+F054	la banda se mueve solo si el sensor detecta la pieza	p -> q	condicional-solo-si
+F055	la banda se mueve si y solo si el sensor detecta la pieza	p <-> q	bicondicional-sysy
+F056	la banda se mueve y la luz se enciende	p & q	conjuncion-y
+F057	la banda se mueve o la luz se enciende	p v q	disyuncion-o
+F058	no la banda se mueve	~p	negacion-no
+F059	la banda se mueve solo si la luz se enciende	p -> q	condicional-solo-si
+F060	la banda se mueve si y solo si la luz se enciende	p <-> q	bicondicional-sysy
+F061	la banda se mueve y la alarma suena	p & q	conjuncion-y
+F062	la banda se mueve o la alarma suena	p v q	disyuncion-o
+F063	no la banda se mueve	~p	negacion-no
+F064	la banda se mueve solo si la alarma suena	p -> q	condicional-solo-si
+F065	la banda se mueve si y solo si la alarma suena	p <-> q	bicondicional-sysy
+F066	la banda se mueve y el sistema reinicia	p & q	conjuncion-y
+F067	la banda se mueve o el sistema reinicia	p v q	disyuncion-o
+F068	no la banda se mueve	~p	negacion-no
+F069	la banda se mueve solo si el sistema reinicia	p -> q	condicional-solo-si
+F070	la banda se mueve si y solo si el sistema reinicia	p <-> q	bicondicional-sysy
+F071	la banda se mueve y el panel responde	p & q	conjuncion-y
+F072	la banda se mueve o el panel responde	p v q	disyuncion-o
+F073	no la banda se mueve	~p	negacion-no
+F074	la banda se mueve solo si el panel responde	p -> q	condicional-solo-si
+F075	la banda se mueve si y solo si el panel responde	p <-> q	bicondicional-sysy
+F076	la banda se mueve y la valvula abre	p & q	conjuncion-y
+F077	la banda se mueve o la valvula abre	p v q	disyuncion-o
+F078	no la banda se mueve	~p	negacion-no
+F079	la banda se mueve solo si la valvula abre	p -> q	condicional-solo-si
+F080	la banda se mueve si y solo si la valvula abre	p <-> q	bicondicional-sysy
+F081	la banda se mueve y la bomba activa	p & q	conjuncion-y
+F082	la banda se mueve o la bomba activa	p v q	disyuncion-o
+F083	no la banda se mueve	~p	negacion-no
+F084	la banda se mueve solo si la bomba activa	p -> q	condicional-solo-si
+F085	la banda se mueve si y solo si la bomba activa	p <-> q	bicondicional-sysy
+F086	la banda se mueve y el control habilita	p & q	conjuncion-y
+F087	la banda se mueve o el control habilita	p v q	disyuncion-o
+F088	no la banda se mueve	~p	negacion-no
+F089	la banda se mueve solo si el control habilita	p -> q	condicional-solo-si
+F090	la banda se mueve si y solo si el control habilita	p <-> q	bicondicional-sysy
+F091	el sensor detecta la pieza y el motor arranca	p & q	conjuncion-y
+F092	el sensor detecta la pieza o el motor arranca	p v q	disyuncion-o
+F093	no el sensor detecta la pieza	~p	negacion-no
+F094	el sensor detecta la pieza solo si el motor arranca	p -> q	condicional-solo-si
+F095	el sensor detecta la pieza si y solo si el motor arranca	p <-> q	bicondicional-sysy
+F096	el sensor detecta la pieza y la banda se mueve	p & q	conjuncion-y
+F097	el sensor detecta la pieza o la banda se mueve	p v q	disyuncion-o
+F098	no el sensor detecta la pieza	~p	negacion-no
+F099	el sensor detecta la pieza solo si la banda se mueve	p -> q	condicional-solo-si
+F100	el sensor detecta la pieza si y solo si la banda se mueve	p <-> q	bicondicional-sysy
+F101	el sensor detecta la pieza y la luz se enciende	p & q	conjuncion-y
+F102	el sensor detecta la pieza o la luz se enciende	p v q	disyuncion-o
+F103	no el sensor detecta la pieza	~p	negacion-no
+F104	el sensor detecta la pieza solo si la luz se enciende	p -> q	condicional-solo-si
+F105	el sensor detecta la pieza si y solo si la luz se enciende	p <-> q	bicondicional-sysy
+F106	el sensor detecta la pieza y la alarma suena	p & q	conjuncion-y
+F107	el sensor detecta la pieza o la alarma suena	p v q	disyuncion-o
+F108	no el sensor detecta la pieza	~p	negacion-no
+F109	el sensor detecta la pieza solo si la alarma suena	p -> q	condicional-solo-si
+F110	el sensor detecta la pieza si y solo si la alarma suena	p <-> q	bicondicional-sysy
+F111	el sensor detecta la pieza y el sistema reinicia	p & q	conjuncion-y
+F112	el sensor detecta la pieza o el sistema reinicia	p v q	disyuncion-o
+F113	no el sensor detecta la pieza	~p	negacion-no
+F114	el sensor detecta la pieza solo si el sistema reinicia	p -> q	condicional-solo-si
+F115	el sensor detecta la pieza si y solo si el sistema reinicia	p <-> q	bicondicional-sysy
+F116	el sensor detecta la pieza y el panel responde	p & q	conjuncion-y
+F117	el sensor detecta la pieza o el panel responde	p v q	disyuncion-o
+F118	no el sensor detecta la pieza	~p	negacion-no
+F119	el sensor detecta la pieza solo si el panel responde	p -> q	condicional-solo-si
+F120	el sensor detecta la pieza si y solo si el panel responde	p <-> q	bicondicional-sysy
+F121	el sensor detecta la pieza y la valvula abre	p & q	conjuncion-y
+F122	el sensor detecta la pieza o la valvula abre	p v q	disyuncion-o
+F123	no el sensor detecta la pieza	~p	negacion-no
+F124	el sensor detecta la pieza solo si la valvula abre	p -> q	condicional-solo-si
+F125	el sensor detecta la pieza si y solo si la valvula abre	p <-> q	bicondicional-sysy
+F126	el sensor detecta la pieza y la bomba activa	p & q	conjuncion-y
+F127	el sensor detecta la pieza o la bomba activa	p v q	disyuncion-o
+F128	no el sensor detecta la pieza	~p	negacion-no
+F129	el sensor detecta la pieza solo si la bomba activa	p -> q	condicional-solo-si
+F130	el sensor detecta la pieza si y solo si la bomba activa	p <-> q	bicondicional-sysy
+F131	el sensor detecta la pieza y el control habilita	p & q	conjuncion-y
+F132	el sensor detecta la pieza o el control habilita	p v q	disyuncion-o
+F133	no el sensor detecta la pieza	~p	negacion-no
+F134	el sensor detecta la pieza solo si el control habilita	p -> q	condicional-solo-si
+F135	el sensor detecta la pieza si y solo si el control habilita	p <-> q	bicondicional-sysy
+F136	la luz se enciende y el motor arranca	p & q	conjuncion-y
+F137	la luz se enciende o el motor arranca	p v q	disyuncion-o
+F138	no la luz se enciende	~p	negacion-no
+F139	la luz se enciende solo si el motor arranca	p -> q	condicional-solo-si
+F140	la luz se enciende si y solo si el motor arranca	p <-> q	bicondicional-sysy
+F141	la luz se enciende y la banda se mueve	p & q	conjuncion-y
+F142	la luz se enciende o la banda se mueve	p v q	disyuncion-o
+F143	no la luz se enciende	~p	negacion-no
+F144	la luz se enciende solo si la banda se mueve	p -> q	condicional-solo-si
+F145	la luz se enciende si y solo si la banda se mueve	p <-> q	bicondicional-sysy
+F146	la luz se enciende y el sensor detecta la pieza	p & q	conjuncion-y
+F147	la luz se enciende o el sensor detecta la pieza	p v q	disyuncion-o
+F148	no la luz se enciende	~p	negacion-no
+F149	la luz se enciende solo si el sensor detecta la pieza	p -> q	condicional-solo-si
+F150	la luz se enciende si y solo si el sensor detecta la pieza	p <-> q	bicondicional-sysy
+F151	la luz se enciende y la alarma suena	p & q	conjuncion-y
+F152	la luz se enciende o la alarma suena	p v q	disyuncion-o
+F153	no la luz se enciende	~p	negacion-no
+F154	la luz se enciende solo si la alarma suena	p -> q	condicional-solo-si
+F155	la luz se enciende si y solo si la alarma suena	p <-> q	bicondicional-sysy
+F156	la luz se enciende y el sistema reinicia	p & q	conjuncion-y
+F157	la luz se enciende o el sistema reinicia	p v q	disyuncion-o
+F158	no la luz se enciende	~p	negacion-no
+F159	la luz se enciende solo si el sistema reinicia	p -> q	condicional-solo-si
+F160	la luz se enciende si y solo si el sistema reinicia	p <-> q	bicondicional-sysy
+F161	la luz se enciende y el panel responde	p & q	conjuncion-y
+F162	la luz se enciende o el panel responde	p v q	disyuncion-o
+F163	no la luz se enciende	~p	negacion-no
+F164	la luz se enciende solo si el panel responde	p -> q	condicional-solo-si
+F165	la luz se enciende si y solo si el panel responde	p <-> q	bicondicional-sysy
+F166	la luz se enciende y la valvula abre	p & q	conjuncion-y
+F167	la luz se enciende o la valvula abre	p v q	disyuncion-o
+F168	no la luz se enciende	~p	negacion-no
+F169	la luz se enciende solo si la valvula abre	p -> q	condicional-solo-si
+F170	la luz se enciende si y solo si la valvula abre	p <-> q	bicondicional-sysy
+F171	la luz se enciende y la bomba activa	p & q	conjuncion-y
+F172	la luz se enciende o la bomba activa	p v q	disyuncion-o
+F173	no la luz se enciende	~p	negacion-no
+F174	la luz se enciende solo si la bomba activa	p -> q	condicional-solo-si
+F175	la luz se enciende si y solo si la bomba activa	p <-> q	bicondicional-sysy
+F176	la luz se enciende y el control habilita	p & q	conjuncion-y
+F177	la luz se enciende o el control habilita	p v q	disyuncion-o
+F178	no la luz se enciende	~p	negacion-no
+F179	la luz se enciende solo si el control habilita	p -> q	condicional-solo-si
+F180	la luz se enciende si y solo si el control habilita	p <-> q	bicondicional-sysy
+F181	la alarma suena y el motor arranca	p & q	conjuncion-y
+F182	la alarma suena o el motor arranca	p v q	disyuncion-o
+F183	no la alarma suena	~p	negacion-no
+F184	la alarma suena solo si el motor arranca	p -> q	condicional-solo-si
+F185	la alarma suena si y solo si el motor arranca	p <-> q	bicondicional-sysy
+F186	la alarma suena y la banda se mueve	p & q	conjuncion-y
+F187	la alarma suena o la banda se mueve	p v q	disyuncion-o
+F188	no la alarma suena	~p	negacion-no
+F189	la alarma suena solo si la banda se mueve	p -> q	condicional-solo-si
+F190	la alarma suena si y solo si la banda se mueve	p <-> q	bicondicional-sysy
+F191	la alarma suena y el sensor detecta la pieza	p & q	conjuncion-y
+F192	la alarma suena o el sensor detecta la pieza	p v q	disyuncion-o
+F193	no la alarma suena	~p	negacion-no
+F194	la alarma suena solo si el sensor detecta la pieza	p -> q	condicional-solo-si
+F195	la alarma suena si y solo si el sensor detecta la pieza	p <-> q	bicondicional-sysy
+F196	la alarma suena y la luz se enciende	p & q	conjuncion-y
+F197	la alarma suena o la luz se enciende	p v q	disyuncion-o
+F198	no la alarma suena	~p	negacion-no
+F199	la alarma suena solo si la luz se enciende	p -> q	condicional-solo-si
+F200	la alarma suena si y solo si la luz se enciende	p <-> q	bicondicional-sysy
+F201	la alarma suena y el sistema reinicia	p & q	conjuncion-y
+F202	la alarma suena o el sistema reinicia	p v q	disyuncion-o
+F203	no la alarma suena	~p	negacion-no
+F204	la alarma suena solo si el sistema reinicia	p -> q	condicional-solo-si
+F205	la alarma suena si y solo si el sistema reinicia	p <-> q	bicondicional-sysy
+F206	En caso de que hay energia, la alarma suena	p -> q	condicional-en-caso
+F207	Siempre que hay energia, el panel responde	p -> q	condicional-siempre-que
+F208	Es falso que hay energia y la alarma suena	~(p & q)	negacion-de-conjuncion
+F209	Ni hay energia ni la bomba activa	~(p v q)	nor-ni-ni
+F210	En caso de que hay presion, la alarma suena	p -> q	condicional-en-caso
+F211	Siempre que hay presion, el panel responde	p -> q	condicional-siempre-que
+F212	Es falso que hay presion y la alarma suena	~(p & q)	negacion-de-conjuncion
+F213	Ni hay presion ni la bomba activa	~(p v q)	nor-ni-ni
+F214	En caso de que hay conexion, la alarma suena	p -> q	condicional-en-caso
+F215	Siempre que hay conexion, el panel responde	p -> q	condicional-siempre-que
+F216	Es falso que hay conexion y la alarma suena	~(p & q)	negacion-de-conjuncion
+F217	Ni hay conexion ni la bomba activa	~(p v q)	nor-ni-ni
+F218	En caso de que hay señal, la alarma suena	p -> q	condicional-en-caso
+F219	Siempre que hay señal, el panel responde	p -> q	condicional-siempre-que
+F220	Es falso que hay señal y la alarma suena	~(p & q)	negacion-de-conjuncion
+F221	Ni hay señal ni la bomba activa	~(p v q)	nor-ni-ni
+F222	En caso de que hay mantenimiento, la alarma suena	p -> q	condicional-en-caso
+F223	Siempre que hay mantenimiento, el panel responde	p -> q	condicional-siempre-que
+F224	Es falso que hay mantenimiento y la alarma suena	~(p & q)	negacion-de-conjuncion
+F225	Ni hay mantenimiento ni la bomba activa	~(p v q)	nor-ni-ni
+
