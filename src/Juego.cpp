@@ -719,22 +719,90 @@ std::string branchLiterals(const TableauBranch& branch,
     return result;
 }
 
+std::string literalDescription(const std::string& atom, bool value)
+{
+    return value ? atom : "no " + atom;
+}
+
+bool formulaContainsAtom(const Formula* formula, const std::string& atom)
+{
+    if (!formula) return false;
+    if (formula->type == Formula::Atom) return formula->atom == atom;
+    return formulaContainsAtom(formula->left, atom) ||
+           formulaContainsAtom(formula->right, atom);
+}
+
+std::string tooltipLines(const std::string& text, size_t width)
+{
+    std::stringstream words(text);
+    std::string word;
+    std::string line;
+    std::string result;
+    while (words >> word)
+    {
+        if (!line.empty() && line.size() + word.size() + 1 > width)
+        {
+            if (!result.empty()) result += '\n';
+            result += line;
+            line.clear();
+        }
+        if (!line.empty()) line += ' ';
+        line += word;
+    }
+    if (!line.empty())
+    {
+        if (!result.empty()) result += '\n';
+        result += line;
+    }
+    return result;
+}
+
 std::string branchReason(const TableauBranch& branch,
-                         const std::vector<std::string>& atoms)
+                         const std::vector<Rule>& rules)
 {
     for (size_t i = 0; i < branch.literals.size(); ++i)
         for (size_t j = i + 1; j < branch.literals.size(); ++j)
             if (branch.literals[i].first == branch.literals[j].first &&
                 branch.literals[i].second != branch.literals[j].second)
             {
-                const auto atom = std::find(atoms.begin(), atoms.end(), branch.literals[i].first);
-                const size_t atomIndex = atom == atoms.end()
-                    ? 0 : static_cast<size_t>(atom - atoms.begin());
-                return "Contradiccion: p" + std::to_string(atomIndex) +
-                       " aparece como V y F. La rama se poda.";
+                const std::string& atomName = branch.literals[i].first;
+                const bool firstValue = branch.literals[i].second;
+                const std::string fact = literalDescription(atomName, firstValue);
+                const std::string opposite = literalDescription(atomName, !firstValue);
+                std::string explanation =
+                    "Contradiccion: la rama exige \"" + fact + "\" y \"" +
+                    opposite + "\" al mismo tiempo. No pueden ser verdaderas " +
+                    "ambas cosas a la vez.";
+                for (const Rule& rule : rules)
+                {
+                    if (formulaContainsAtom(rule.formula, atomName))
+                    {
+                        explanation += " Entra en conflicto con: " + rule.original;
+                        break;
+                    }
+                }
+                explanation += " La rama queda cerrada.";
+                return tooltipLines(explanation, 58);
             }
-    return branch.closed ? "Rama cerrada por una contradiccion." :
-                           "Rama abierta: no contiene literales contradictorios.";
+    if (branch.closed)
+        return "Rama cerrada: una de sus reglas obliga a dos valores incompatibles. "
+               "Por eso este camino no puede satisfacer todas las premisas.";
+
+    std::string explanation = "Rama abierta y satisfacible: ";
+    if (branch.literals.empty())
+        explanation += "no impone hechos incompatibles.";
+    else
+    {
+        explanation += "pueden cumplirse a la vez ";
+        for (size_t i = 0; i < branch.literals.size(); ++i)
+        {
+            if (i > 0) explanation += (i + 1 == branch.literals.size() ? " y " : ", ");
+            explanation += "\"" + literalDescription(branch.literals[i].first,
+                                                     branch.literals[i].second) + "\"";
+        }
+        explanation += ". Ningun hecho de esta rama contradice a otro.";
+    }
+    return tooltipLines(explanation, 58);
 }
 
 bool button(sf::RenderWindow& window, sf::Font& font, const std::string& label,
@@ -1287,7 +1355,7 @@ int main(int argc, char** argv)
                         if (hit.contains(world))
                         {
                             tooltip = "B" + std::to_string(branchIndex + 1) + ": " +
-                                      branchReason(tableau[branchIndex], atoms);
+                                      branchReason(tableau[branchIndex], rules);
                             break;
                         }
                     }
@@ -1645,25 +1713,25 @@ int main(int argc, char** argv)
         drawText(window, font, "Verde = abierta    Rojo/X = cerrada", 850, 320, 11, Muted);
         if (!tooltip.empty())
         {
-            sf::RectangleShape tooltipBox(sf::Vector2f(395, 48));
+            sf::RectangleShape tooltipBox(sf::Vector2f(395, 78));
             tooltipBox.setPosition(840, 325);
             tooltipBox.setFillColor(sf::Color(8, 14, 22, 245));
             tooltipBox.setOutlineThickness(1);
             tooltipBox.setOutlineColor(Cyan);
             window.draw(tooltipBox);
-            drawText(window, font, tooltip, 848, 337, 11, sf::Color::White);
+            drawText(window, font, tooltip, 848, 333, 10, sf::Color::White);
         }
-        drawText(window, font, "05  REPORTE DE MODELOS", 840, 350, 16, Cyan);
-        drawText(window, font, "ESTADO:", 850, 385, 13, Muted);
-        drawText(window, font, satisfiable ? "SATISFACIBLE" : "INSATISFACIBLE", 930, 383, 17, satisfiable ? Green : Red);
-        drawText(window, font, "Modelos que cumplen todas las reglas:", 850, 415, 12, Muted);
+        drawText(window, font, "05  REPORTE DE MODELOS", 840, 410, 16, Cyan);
+        drawText(window, font, "ESTADO:", 850, 445, 13, Muted);
+        drawText(window, font, satisfiable ? "SATISFACIBLE" : "INSATISFACIBLE", 930, 443, 17, satisfiable ? Green : Red);
+        drawText(window, font, "Modelos que cumplen todas las reglas:", 850, 475, 12, Muted);
         for (size_t i = 0; i < models.size() && i < 8; ++i)
         {
             std::string row = "M" + std::to_string(i + 1) + "  ";
             for (size_t atomIndex = 0; atomIndex < atoms.size(); ++atomIndex)
                 row += std::string(1, static_cast<char>('p' + atomIndex)) + "=" +
                        (models[i].values.at(atoms[atomIndex]) ? "V  " : "F  ");
-            drawText(window, font, row, 855, 440 + static_cast<float>(i) * 18, 12, Green);
+            drawText(window, font, row, 855, 500 + static_cast<float>(i) * 18, 12, Green);
         }
         drawPanel(window, 20, 640, 785, 105);
         drawText(window, font, "06  MEMORIAS GUARDADAS", 35, 650, 14, Cyan);

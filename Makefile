@@ -17,6 +17,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
 VIDEO_LIBS := -lmfplay -lmfplat -lmfuuid -lole32
+MINGW_BIN := $(shell dirname "$(shell command -v $(CXX))")
 endif
 
 WINE ?= wine
@@ -26,7 +27,11 @@ ifeq ($(strip $(DISPLAY)),)
 ifneq ($(shell command -v xvfb-run 2>/dev/null),)
 RUN_COMMAND ?= ALSOFT_DRIVERS=null xvfb-run -a ./$(TARGET)
 else
+ifeq ($(OS),Windows_NT)
+RUN_COMMAND ?= PATH="$(MINGW_BIN):$$PATH" ./$(TARGET)
+else
 RUN_COMMAND ?= ./$(TARGET)
+endif
 endif
 else
 RUN_COMMAND ?= ./$(TARGET)
@@ -58,7 +63,7 @@ run: build
 	$(RUN_COMMAND)
 
 test: build
-	./$(TARGET) --test
+	$(RUN_COMMAND) --test
 
 clean:
 	rm -f $(OBJECTS) $(TARGET)
